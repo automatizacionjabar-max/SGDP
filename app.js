@@ -177,6 +177,10 @@ const App = {
         document.getElementById('dev-new-btn').addEventListener('click', () => ReturnsModule.reset());
         document.getElementById('search-devoluciones').addEventListener('input', (e) => ReturnsModule.filterHistory(e.target.value));
 
+        // Empleados Pagination
+        document.getElementById('emp-prev-page').addEventListener('click', () => EmpleadosModule.prevPage());
+        document.getElementById('emp-next-page').addEventListener('click', () => EmpleadosModule.nextPage());
+
         // Connectivity
         window.addEventListener('online', () => document.getElementById('offline-banner').classList.add('hidden'));
         window.addEventListener('offline', () => document.getElementById('offline-banner').classList.remove('hidden'));
@@ -308,6 +312,11 @@ const DashboardModule = {
 // ===================================================================
 const EmpleadosModule = {
     data: [],
+    filteredData: [],
+    currentPage: 1,
+    pageSize: 50,
+    optionsCache: null,
+    searchTimeout: null,
 
     async load() {
         const c = document.getElementById('empleados-table-container');
@@ -315,25 +324,70 @@ const EmpleadosModule = {
         const result = await api.request('getEmpleados', {}, true);
         if (!result || !result.success) { c.innerHTML = '<p class="loading-text">Error al cargar.</p>'; return; }
         this.data = result.data;
+        this.filteredData = result.data;
         document.getElementById('stat-emp-count').textContent = this.data.length;
-        this.render(this.data);
+        this.currentPage = 1;
+        this.render();
     },
 
-    render(employees) {
+    render() {
         const c = document.getElementById('empleados-table-container');
-        if (employees.length === 0) { c.innerHTML = '<p class="loading-text">No hay empleados.</p>'; return; }
+        const start = (this.currentPage - 1) * this.pageSize;
+        const end = start + this.pageSize;
+        const pageItems = this.filteredData.slice(start, end);
+
+        if (this.filteredData.length === 0) {
+            c.innerHTML = '<p class="loading-text">No se encontraron empleados.</p>';
+            document.getElementById('empleados-pagination').classList.add('hidden');
+            return;
+        }
+
+        document.getElementById('empleados-pagination').classList.remove('hidden');
         let h = '<table><thead><tr><th>Cédula</th><th>Nombres</th><th>Apellidos</th><th>Cargo</th><th>Área</th><th>Sede</th><th>Estado</th><th>Acción</th></tr></thead><tbody>';
-        employees.forEach(emp => {
+        pageItems.forEach(emp => {
             const estado = emp['Estado'] === 'Activo' ? '<span class="badge badge-success">Activo</span>' : '<span class="badge badge-danger">Inactivo</span>';
             h += `<tr><td>${emp['ID_Empleado'] || ''}</td><td>${emp['Nombres'] || ''}</td><td>${emp['Apellidos'] || ''}</td><td>${emp['Cargo'] || ''}</td><td>${emp['Area'] || ''}</td><td>${emp['SedePorcicola'] || ''}</td><td>${estado}</td><td><button class="btn-edit" onclick="EmpleadosModule.openEdit(${emp._rowIndex})">Editar</button></td></tr>`;
         });
         h += '</tbody></table>';
         c.innerHTML = h;
+
+        this.updatePagination();
+    },
+
+    updatePagination() {
+        const totalPages = Math.ceil(this.filteredData.length / this.pageSize);
+        document.getElementById('emp-page-info').textContent = `Página ${this.currentPage} de ${totalPages || 1}`;
+        document.getElementById('emp-prev-page').disabled = this.currentPage === 1;
+        document.getElementById('emp-next-page').disabled = this.currentPage >= totalPages;
+    },
+
+    nextPage() {
+        const totalPages = Math.ceil(this.filteredData.length / this.pageSize);
+        if (this.currentPage < totalPages) {
+            this.currentPage++;
+            this.render();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    },
+
+    prevPage() {
+        if (this.currentPage > 1) {
+            this.currentPage--;
+            this.render();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
     },
 
     filter(q) {
-        q = q.toLowerCase();
-        this.render(this.data.filter(e => [e['ID_Empleado'], e['Nombres'], e['Apellidos'], e['Area'], e['Cargo']].some(v => String(v || '').toLowerCase().includes(q))));
+        clearTimeout(this.searchTimeout);
+        this.searchTimeout = setTimeout(() => {
+            const query = q.toLowerCase();
+            this.filteredData = this.data.filter(e =>
+                [e['ID_Empleado'], e['Nombres'], e['Apellidos'], e['Area'], e['Cargo']].some(v => String(v || '').toLowerCase().includes(query))
+            );
+            this.currentPage = 1;
+            this.render();
+        }, 300);
     },
 
     async openNew() {
@@ -371,13 +425,16 @@ const EmpleadosModule = {
     },
 
     async loadOptions() {
+        if (this.optionsCache) return this.optionsCache;
+
         const r = await api.request('getEmpleadosOptions', {}, true);
         if (r && r.success) {
+            this.optionsCache = r.data;
             populateSelect('emp-cargo', r.data.cargos);
             populateSelect('emp-area', r.data.areas);
             populateSelect('emp-sede', r.data.sedes);
-            populateSelect('emp-empresa', r.data.empresas); // Added for multi-company
-            return r.data; // Return data for openEdit to use
+            populateSelect('emp-empresa', r.data.empresas);
+            return r.data;
         }
         return null;
     },
@@ -877,3 +934,93 @@ const ReturnsModule = {
     async processReturn() {
         const payload = {
             asigOriginalId: document.getElementById('dev-asig-id').value,
+            employeeId: this.employeeId,
+            sku: document.getElementById('dev-sku').value,
+            quantityReturned: parseInt(document.getElementById('dev-quantity').value) || 1,
+            itemCondition: document.getElementById('dev-condition').value,
+            notes: document.getElementById('dev-notes').value,
+            signatureEmpB64: this.sigEmp ? this.sigEmp.toBase64Raw() : '',
+            signatureRespB64: this.sigResp ? this.sigResp.toBase64Raw() : ''
+        };
+
+        showLoader('Procesando devolución...');
+        const result = await api.request('processReturn', payload);
+        hideLoader();
+
+        if (result && result.success) {
+            const condition = document.getElementById('dev-condition').value;
+            const empId = document.getElementById('dev-emp-id').value;
+
+            // Datos para el PDF
+            const pdfData = {
+                dev_id: result.dev_id || 'DEV-TEMP',
+                timestamp: new Date().toLocaleString(),
+                employee_id: empId,
+                employee_name: '', // Podríamos buscarlo en el cache de empleados
+                sku: payload.sku,
+                item_name: 'EPP', // Sería ideal obtenerlo del objeto original
+                quantity: payload.quantityReturned,
+                item_condition: condition,
+                company: '', // Sería ideal obtenerlo del empleado
+                current_user_email: api.getUser()?.email,
+                signature_emp_b64: this.sigEmp ? this.sigEmp.toBase64() : '',
+                signature_resp_b64: this.sigResp ? this.sigResp.toBase64() : ''
+            };
+
+            // Generar PDF correspondiente
+            let pdfBase64 = null;
+            if (condition === 'Bueno') {
+                pdfBase64 = generateReturnPDF(pdfData, true);
+                generateReturnPDF(pdfData); // Descarga local
+            } else {
+                pdfBase64 = generateDisposalPDF(pdfData, true);
+                generateDisposalPDF(pdfData); // Descarga local
+            }
+
+            // Respaldo en Drive
+            if (pdfBase64) {
+                api.request('savePdfToDrive', {
+                    pdfBase64: pdfBase64,
+                    filename: `${condition === 'Bueno' ? 'Devolucion' : 'Acta_Eliminacion'}_${pdfData.dev_id}.pdf`,
+                    folderId: DRIVE_FOLDER_ID
+                });
+            }
+
+            showToast(result.message);
+            this.reset();
+            this.loadHistory();
+            api.invalidateCache();
+        } else {
+            showToast(result?.message || 'Error.', 'error');
+        }
+    },
+
+    downloadHistoryPDF(idx) {
+        const d = this.historyData[idx];
+        if (!d) return;
+
+        const pdfData = {
+            dev_id: d.ID_Devolucion,
+            timestamp: d.Timestamp,
+            employee_id: d.ID_Empleado,
+            sku: d.SKU,
+            quantity: d.CantidadDevuelta,
+            item_condition: d.EstadoItem,
+            current_user_email: d.ProcesadoPor,
+            signature_emp_b64: d.FirmaEmp,
+            signature_resp_b64: d.FirmaResp
+        };
+
+        if (d.EstadoItem === 'Bueno') {
+            generateReturnPDF(pdfData);
+        } else {
+            generateDisposalPDF(pdfData);
+        }
+        showToast('Documento histórico descargado');
+    }
+};
+
+// ===================================================================
+// INIT
+// ===================================================================
+document.addEventListener('DOMContentLoaded', () => App.init());

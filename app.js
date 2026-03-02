@@ -7,6 +7,8 @@
 // CONFIGURATION — ¡CAMBIAR ESTA URL DESPUÉS DEL DEPLOY!
 // ===================================================================
 const API_URL = 'https://script.google.com/macros/s/AKfycbyOVwyulSMkr-07J84D-MqigyFVfnUAc2eIIEdKVP7jQZfbaGXWTBOHwXSi8CjMFVV4/exec';
+const DRIVE_FOLDER_ID = '1SshRHJnn1cCaU-7xf6ssmCerzCGihQyx'; // OPCIONAL: ID de carpeta de Google Drive para guardar PDFs
+
 // Ejemplo: 'https://script.google.com/macros/s/AKfycb.../exec'
 
 // ===================================================================
@@ -708,6 +710,20 @@ const AssignmentsModule = {
             showToast(result.message);
             api.invalidateCache();
             this.loadHistory(); // Refresh history
+
+            // --- RESPALDO EN DRIVE (Opcional) ---
+            const pdfBase64 = generateAssignmentPDF(this.lastAssignmentData, true);
+            if (pdfBase64) {
+                api.request('savePdfToDrive', {
+                    pdfBase64: pdfBase64,
+                    filename: `Recibo_${this.lastAssignmentData.asig_id}.pdf`,
+                    folderId: DRIVE_FOLDER_ID
+                }).then(driveRes => {
+                    if (driveRes && driveRes.success) {
+                        console.log('Respaldo en Drive exitoso:', driveRes.fileUrl);
+                    }
+                });
+            }
         } else {
             showToast(result?.message || 'Error al guardar.', 'error');
         }

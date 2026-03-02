@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="SGD-P - Sistema de Gestión de Dotación y EPP para SST">
+    <title>SGD-P | Sistema de Gestión de Dotación y EPP</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
+</head>
+
+<body>
+    <!-- ===== LOADER ===== -->
+    <div id="loader" class="loader-overlay hidden">
+        <div class="loader-spinner"></div>
+        <p class="loader-text">Procesando...</p>
+    </div>
+
+    <!-- ===== TOAST NOTIFICATIONS ===== -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- ===== CONNECTIVITY BANNER ===== -->
+    <div id="offline-banner" class="offline-banner hidden">
+        ⚠️ Sin conexión a internet
+    </div>
+
+    <!-- ==================== LOGIN ==================== -->
+    <section id="page-login" class="page active">
+        <div class="login-wrapper">
+            <div class="login-card glass-card">
+                <div class="login-logo">
+                    <div class="logo-icon">🛡️</div>
+                    <h1>SGD-P</h1>
+                    <p class="login-subtitle">Sistema de Gestión de Dotación y EPP</p>
+                </div>
+                <form id="login-form" autocomplete="off">
+                    <div class="input-group">
+                        <label for="login-email">Correo Electrónico</label>
+                        <input type="email" id="login-email" placeholder="usuario@empresa.com" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="login-password">Contraseña</label>
+                        <input type="password" id="login-password" placeholder="••••••••" required>
+                    </div>
+                    <button type="submit" id="login-btn" class="btn btn-primary btn-full">
+                        <span class="btn-text">Iniciar Sesión</span>
+                        <span class="btn-loader hidden"></span>
+                    </button>
+                    <p id="login-error" class="error-text hidden"></p>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- ==================== APP SHELL ==================== -->
+    <section id="app-shell" class="hidden">
+        <!-- SIDEBAR -->
+        <nav id="sidebar" class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">🛡️</div>
+                <span class="sidebar-title">SGD-P</span>
+                <button id="sidebar-toggle" class="sidebar-toggle" aria-label="Cerrar menú">✕</button>
+            </div>
+
+            <div class="sidebar-user">
+                <div class="user-avatar" id="user-avatar">U</div>
+                <div class="user-info">
+                    <span id="user-name" class="user-name">Usuario</span>
+                    <span id="user-role" class="user-role">SST</span>
+                </div>
+            </div>
+
+            <ul class="sidebar-nav">
+                <li><a href="#" class="nav-item active" data-page="dashboard"><span class="nav-icon">📊</span>
+                        Dashboard</a></li>
+                <li><a href="#" class="nav-item" data-page="empleados"><span class="nav-icon">👥</span> Personal</a>
+                </li>
+                <li><a href="#" class="nav-item" data-page="inventario"><span class="nav-icon">📦</span> Inventario</a>
+                </li>
+                <li><a href="#" class="nav-item" data-page="asignaciones"><span class="nav-icon">📋</span>
+                        Asignaciones</a></li>
+                <li><a href="#" class="nav-item" data-page="devoluciones"><span class="nav-icon">🔄</span>
+                        Devoluciones</a></li>
+            </ul>
+
+            <div class="sidebar-footer">
+                <button id="logout-btn" class="btn btn-danger btn-full btn-sm">Cerrar Sesión</button>
+            </div>
+        </nav>
+
+        <!-- SIDEBAR OVERLAY (mobile) -->
+        <div id="sidebar-overlay" class="sidebar-overlay hidden"></div>
+
+        <!-- MAIN CONTENT -->
+        <main class="main-content">
+            <!-- TOP BAR -->
+            <header class="topbar">
+                <button id="menu-toggle" class="menu-toggle" aria-label="Abrir menú">☰</button>
+                <h2 id="page-title" class="topbar-title">Dashboard</h2>
+                <div class="topbar-right">
+                    <span id="topbar-user" class="topbar-user"></span>
+                </div>
+            </header>
+
+            <!-- ===== DASHBOARD PAGE ===== -->
+            <div id="page-dashboard" class="page-content active">
+                <div class="dashboard-grid">
+                    <!-- Stats Cards -->
+                    <div class="stat-card glass-card" id="stat-alerts">
+                        <div class="stat-icon">🚨</div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="stat-alert-count">-</span>
+                            <span class="stat-label">Alertas de Stock</span>
+                        </div>
+                    </div>
+                    <div class="stat-card glass-card" id="stat-employees">
+                        <div class="stat-icon">👥</div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="stat-emp-count">-</span>
+                            <span class="stat-label">Empleados</span>
+                        </div>
+                    </div>
+                    <div class="stat-card glass-card" id="stat-inventory">
+                        <div class="stat-icon">📦</div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="stat-inv-count">-</span>
+                            <span class="stat-label">Artículos EPP</span>
+                        </div>
+                    </div>
+
+                    <!-- Alerts Table -->
+                    <div class="dashboard-section glass-card">
+                        <h3>🚨 Alertas: Bajo Stock</h3>
+                        <div id="alerts-container" class="table-responsive">
+                            <p class="loading-text">Cargando alertas...</p>
+                        </div>
+                    </div>
+
+                    <!-- Recent Logs -->
+                    <div class="dashboard-section glass-card">
+                        <h3>📝 Últimos Eventos</h3>
+                        <div id="logs-container">
+                            <p class="loading-text">Cargando eventos...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== EMPLEADOS PAGE ===== -->
+            <div id="page-empleados" class="page-content hidden">
+                <div class="page-header">
+                    <h3>Gestión de Personal</h3>
+                    <button id="btn-nuevo-empleado" class="btn btn-primary btn-sm">+ Nuevo Empleado</button>
+                </div>
+                <div class="search-bar">
+                    <input type="text" id="search-empleados" placeholder="🔍 Buscar por cédula, nombre o área..."
+                        class="search-input">
+                </div>
+                <div id="empleados-table-container" class="table-responsive">
+                    <p class="loading-text">Cargando empleados...</p>
+                </div>
+
+                <!-- Modal Nuevo/Editar Empleado -->
+                <div id="modal-empleado" class="modal hidden">
+                    <div class="modal-content glass-card">
+                        <div class="modal-header">
+                            <h3 id="modal-empleado-title">Nuevo Empleado</h3>
+                            <button class="modal-close" data-modal="modal-empleado">✕</button>
+                        </div>
+                        <form id="form-empleado" class="modal-body">
+                            <div class="form-grid">
+                                <div class="input-group">
+                                    <label for="emp-cedula">Cédula / ID</label>
+                                    <input type="text" id="emp-cedula" required>
+                                </div>
+                                <div class="input-group">
+                                    <label for="emp-nombres">Nombres</label>
+                                    <input type="text" id="emp-nombres" required>
+                                </div>
+                                <div class="input-group">
+                                    <label for="emp-apellidos">Apellidos</label>
+                                    <input type="text" id="emp-apellidos" required>
+                                </div>
+                                <div class="input-group">
+                                    <label for="emp-cargo">Cargo</label>
+                                    <select id="emp-cargo">
+                                        <option value="">Cargando...</option>
+                                    </select>
+                                </div>
+                                <div class="input-group">
+                                    <label for="emp-area">Área</label>
+                                    <select id="emp-area">
+                                        <option value="">Cargando...</option>
+                                    </select>
+                                </div>
+                                <div class="input-group">
+                                    <label for="emp-sede">Sede</label>
+                                    <select id="emp-sede">
+                                        <option value="">Cargando...</option>
+                                    </select>
+                                </div>
+                                <div class="input-group">
+                                    <label for="emp-fecha">Fecha Ingreso</label>
+                                    <input type="date" id="emp-fecha" required>
+                                </div>
+                                <div class="input-group">
+                                    <label for="emp-estado">Estado</label>
+                                    <select id="emp-estado">
+                                        <option value="Activo">Activo</option>
+                                        <option value="Inactivo">Inactivo</option>
+                                    </select>
+                                </div>
+                                <div class="input-group full-width">
+                                    <label for="emp-consentimiento">Consentimiento Ley 1581</label>
+                                    <select id="emp-consentimiento">
+                                        <option value="Sí">Sí</option>
+                                        <option value="No">No</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <input type="hidden" id="emp-edit-index" value="">
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary"
+                                    data-modal="modal-empleado">Cancelar</button>
+                                <button type="submit" class="btn btn-primary">Guardar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== INVENTARIO PAGE ===== -->
+            <div id="page-inventario" class="page-content hidden">
+                <div class="page-header">
+                    <h3>Gestión de Inventario EPP</h3>
+                    <button id="btn-nuevo-articulo" class="btn btn-primary btn-sm">+ Nuevo Artículo</button>
+                </div>
+                <div class="search-bar">
+                    <input type="text" id="search-inventario" placeholder="🔍 Buscar por SKU o nombre..."
+                        class="search-input">
+                </div>
+                <div id="inventario-table-container" class="table-responsive">
+                    <p class="loading-text">Cargando inventario...</p>
+                </div>
+
+                <!-- Modal Nuevo/Editar Artículo -->
+                <div id="modal-inventario" class="modal hidden">
+                    <div class="modal-content glass-card modal-lg">
+                        <div class="modal-header">
+                            <h3 id="modal-inventario-title">Nuevo Artículo</h3>
+                            <button class="modal-close" data-modal="modal-inventario">✕</button>
+                        </div>
+                        <form id="form-inventario" class="modal-body">
+                            <div class="form-grid">
+                                <div class="input-group">
+                                    <label for="inv-sku">SKU</label>
+                                    <input type="text" id="inv-sku" required>
+                                </div>
+                                <div class="input-group">
+                                    <label for="inv-nombre">Nombre</label>
+                                    <input type="text" id="inv-nombre" required>
+                                </div>
+                                <div class="input-group full-width">
+                                    <label for="inv-descripcion">Descripción</label>
+                                    <input type="text" id="inv-descripcion">
+                                </div>
+                                <div class="input-group">
+                                    <label for="inv-tipo">Tipo</label>
+                                    <select id="inv-tipo">
+                                        <option value="">Cargando...</option>
+                                    </select>
+                                </div>
+                                <div class="input-group">
+                                    <label for="inv-stock">Stock Actual</label>
+                                    <input type="number" id="inv-stock" min="0" required>
+                                </div>
+                                <div class="input-group">
+                                    <label for="inv-minimo">Stock Mínimo</label>
+                                    <input type="number" id="inv-minimo" min="0" required>
+                                </div>
+                                <div class="input-group">
+                                    <label for="inv-unidad">Unidad</label>
+                                    <select id="inv-unidad">
+                                        <option value="">Cargando...</option>
+                                    </select>
+                                </div>
+                                <div class="input-group">
+                                    <label for="inv-vencimiento">Vencimiento</label>
+                                    <input type="date" id="inv-vencimiento">
+                                </div>
+                                <div class="input-group">
+                                    <label for="inv-proveedor">Proveedor</label>
+                                    <select id="inv-proveedor">
+                                        <option value="">Cargando...</option>
+                                    </select>
+                                </div>
+                                <div class="input-group">
+                                    <label for="inv-costo">Costo Unitario</label>
+                                    <input type="number" id="inv-costo" step="0.01" min="0">
+                                </div>
+                                <div class="input-group">
+                                    <label for="inv-stockmant">Stock Mant.</label>
+                                    <input type="number" id="inv-stockmant" min="0" value="0">
+                                </div>
+                                <div class="input-group">
+                                    <label for="inv-stockbaja">Stock Baja</label>
+                                    <input type="number" id="inv-stockbaja" min="0" value="0">
+                                </div>
+                                <div class="input-group full-width">
+                                    <label for="inv-ubicacion">Ubicación</label>
+                                    <input type="text" id="inv-ubicacion">
+                                </div>
+                            </div>
+                            <input type="hidden" id="inv-edit-index" value="">
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary"
+                                    data-modal="modal-inventario">Cancelar</button>
+                                <button type="submit" class="btn btn-primary">Guardar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== ASIGNACIONES PAGE ===== -->
+            <div id="page-asignaciones" class="page-content hidden">
+                <div class="page-header">
+                    <h3>Asignación de EPP</h3>
+                </div>
+                <div class="assignment-flow glass-card">
+                    <!-- Step 1: Buscar Empleado -->
+                    <div id="asig-step-1" class="asig-step">
+                        <h4>Paso 1: Identificar Empleado</h4>
+                        <div class="input-row">
+                            <input type="text" id="asig-emp-id" placeholder="Ingrese cédula del empleado"
+                                class="search-input">
+                            <button id="asig-search-btn" class="btn btn-primary btn-sm">Buscar</button>
+                        </div>
+                        <div id="asig-emp-info" class="info-card hidden">
+                            <p><strong>Nombre:</strong> <span id="asig-emp-name">-</span></p>
+                            <p><strong>Cargo:</strong> <span id="asig-emp-cargo">-</span></p>
+                            <p><strong>Área:</strong> <span id="asig-emp-area">-</span></p>
+                        </div>
+                    </div>
+
+                    <!-- Step 2: Seleccionar EPP -->
+                    <div id="asig-step-2" class="asig-step hidden">
+                        <h4>Paso 2: Seleccionar EPP</h4>
+                        <div class="form-grid">
+                            <div class="input-group">
+                                <label for="asig-item">Artículo</label>
+                                <select id="asig-item">
+                                    <option value="">Seleccione...</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label for="asig-quantity">Cantidad</label>
+                                <input type="number" id="asig-quantity" min="1" value="1">
+                            </div>
+                            <div class="input-group">
+                                <label for="asig-delivery-type">Tipo Entrega</label>
+                                <select id="asig-delivery-type">
+                                    <option value="Dotación">Dotación</option>
+                                    <option value="Reposición">Reposición</option>
+                                    <option value="Emergencia">Emergencia</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label for="asig-due-date">Próximo Vencimiento</label>
+                                <input type="date" id="asig-due-date">
+                            </div>
+                            <div class="input-group full-width">
+                                <label for="asig-notes">Notas</label>
+                                <textarea id="asig-notes" rows="2" placeholder="Observaciones..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 3: Firmas -->
+                    <div id="asig-step-3" class="asig-step hidden">
+                        <h4>Paso 3: Firmas Digitales</h4>
+                        <div class="signatures-grid">
+                            <div class="signature-box">
+                                <label>Firma del Empleado</label>
+                                <canvas id="sig-empleado" class="signature-canvas" width="350" height="150"></canvas>
+                                <button type="button" class="btn btn-secondary btn-xs"
+                                    id="clear-sig-emp">Limpiar</button>
+                            </div>
+                            <div class="signature-box">
+                                <label>Firma del Responsable SST</label>
+                                <canvas id="sig-responsable" class="signature-canvas" width="350" height="150"></canvas>
+                                <button type="button" class="btn btn-secondary btn-xs"
+                                    id="clear-sig-resp">Limpiar</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="asig-actions">
+                        <button id="asig-prev-btn" class="btn btn-secondary hidden">← Anterior</button>
+                        <button id="asig-next-btn" class="btn btn-primary hidden">Siguiente →</button>
+                        <button id="asig-save-btn" class="btn btn-success hidden">✅ Guardar Asignación</button>
+                    </div>
+                </div>
+
+                <!-- Assignment Result -->
+                <div id="asig-result" class="glass-card hidden">
+                    <h4>✅ Asignación Registrada</h4>
+                    <p id="asig-result-msg"></p>
+                    <button id="asig-download-pdf" class="btn btn-primary btn-sm">📄 Descargar Recibo PDF</button>
+                    <button id="asig-new-btn" class="btn btn-secondary btn-sm">+ Nueva Asignación</button>
+                </div>
+            </div>
+
+            <!-- ===== DEVOLUCIONES PAGE ===== -->
+            <div id="page-devoluciones" class="page-content hidden">
+                <div class="page-header">
+                    <h3>Devolución de EPP</h3>
+                </div>
+                <div class="return-flow glass-card">
+                    <!-- Step 1: Buscar empleado -->
+                    <div class="input-row">
+                        <input type="text" id="dev-emp-id" placeholder="Ingrese cédula del empleado"
+                            class="search-input">
+                        <button id="dev-search-btn" class="btn btn-primary btn-sm">Buscar Asignaciones</button>
+                    </div>
+
+                    <!-- Step 2: Asignaciones previas -->
+                    <div id="dev-assignments" class="hidden">
+                        <h4>Asignaciones del Empleado</h4>
+                        <div id="dev-assignments-list" class="table-responsive"></div>
+                    </div>
+
+                    <!-- Step 3: Formulario de devolución -->
+                    <div id="dev-form-container" class="hidden">
+                        <h4>Registrar Devolución</h4>
+                        <div class="form-grid">
+                            <div class="input-group">
+                                <label>ID Asignación</label>
+                                <input type="text" id="dev-asig-id" readonly>
+                            </div>
+                            <div class="input-group">
+                                <label>SKU</label>
+                                <input type="text" id="dev-sku" readonly>
+                            </div>
+                            <div class="input-group">
+                                <label for="dev-quantity">Cantidad a Devolver</label>
+                                <input type="number" id="dev-quantity" min="1" value="1">
+                            </div>
+                            <div class="input-group">
+                                <label for="dev-condition">Estado del Artículo</label>
+                                <select id="dev-condition">
+                                    <option value="Bueno">Bueno</option>
+                                    <option value="Regular">Regular</option>
+                                    <option value="Dañado">Dañado</option>
+                                </select>
+                            </div>
+                            <div class="input-group full-width">
+                                <label for="dev-notes">Notas</label>
+                                <textarea id="dev-notes" rows="2"
+                                    placeholder="Observaciones sobre el estado del EPP..."></textarea>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button id="dev-save-btn" class="btn btn-primary">Procesar Devolución</button>
+                        </div>
+                    </div>
+
+                    <!-- Result -->
+                    <div id="dev-result" class="hidden">
+                        <div class="success-message">
+                            <h4>✅ Devolución Registrada</h4>
+                            <p id="dev-result-msg"></p>
+                            <button id="dev-new-btn" class="btn btn-secondary btn-sm">+ Nueva Devolución</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </section>
+
+    <script src="signature.js"></script>
+    <script src="pdf.js"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>

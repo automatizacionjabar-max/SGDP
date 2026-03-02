@@ -357,16 +357,29 @@ const EmpleadosModule = {
         document.getElementById('emp-fecha').value = emp['FechaIngreso'] || '';
         document.getElementById('emp-estado').value = emp['Estado'] || 'Activo';
         document.getElementById('emp-consentimiento').value = emp['ConsentimientoLey1581'] || 'Sí';
-        await this.loadOptions();
+        const opt = await this.loadOptions(); // Load options and get the result
         document.getElementById('emp-cargo').value = emp['Cargo'] || '';
+        if (opt) { // Ensure opt is available before using it
+            document.getElementById('emp-area').innerHTML = '<option value="">Seleccione...</option>' + opt.areas.map(v => `<option value="${v}">${v}</option>`).join('');
+            document.getElementById('emp-sede').innerHTML = '<option value="">Seleccione...</option>' + opt.sedes.map(v => `<option value="${v}">${v}</option>`).join('');
+            document.getElementById('emp-empresa').innerHTML = '<option value="">Seleccione...</option>' + opt.empresas.map(v => `<option value="${v}">${v}</option>`).join('');
+        }
         document.getElementById('emp-area').value = emp['Area'] || '';
         document.getElementById('emp-sede').value = emp['SedePorcicola'] || '';
+        document.getElementById('emp-empresa').value = emp['Empresa'] || '';
         openModal('modal-empleado');
     },
 
     async loadOptions() {
         const r = await api.request('getEmpleadosOptions', {}, true);
-        if (r && r.success) { populateSelect('emp-cargo', r.data.cargos); populateSelect('emp-area', r.data.areas); populateSelect('emp-sede', r.data.sedes); }
+        if (r && r.success) {
+            populateSelect('emp-cargo', r.data.cargos);
+            populateSelect('emp-area', r.data.areas);
+            populateSelect('emp-sede', r.data.sedes);
+            populateSelect('emp-empresa', r.data.empresas); // Added for multi-company
+            return r.data; // Return data for openEdit to use
+        }
+        return null;
     },
 
     async save() {
@@ -374,10 +387,11 @@ const EmpleadosModule = {
         const datos = [
             document.getElementById('emp-cedula').value.trim(),
             document.getElementById('emp-nombres').value.trim(),
-            document.getElementById('emp-apellidos').value.trim(),
+            document.getElementById('emp-apellidos').value,
             document.getElementById('emp-cargo').value,
             document.getElementById('emp-area').value,
             document.getElementById('emp-sede').value,
+            document.getElementById('emp-empresa').value,
             document.getElementById('emp-fecha').value,
             document.getElementById('emp-estado').value,
             document.getElementById('emp-consentimiento').value
@@ -600,6 +614,8 @@ const AssignmentsModule = {
             quantity: a.Cantidad,
             current_user_email: a.EntregadoPor,
             delivery_type: a.TipoEntrega,
+            employee_name: a.EmpleadoNombre || '', // Asegurar que llegue desde el backend si es posible
+            company: a.Empresa || '',
             due_date: a.ProximoVencimiento || '',
             item_name: a.ItemNombre,
             notes: a.Notas || '',
@@ -743,6 +759,8 @@ const AssignmentsModule = {
 const ReturnsModule = {
     employeeId: '',
     historyData: [],
+    sigEmp: null, // Added for return signatures
+    sigResp: null, // Added for return signatures
 
     async load() {
         this.loadHistory();
@@ -764,6 +782,9 @@ const ReturnsModule = {
         document.getElementById('dev-assignments').classList.add('hidden');
         document.getElementById('dev-form-container').classList.add('hidden');
         document.getElementById('dev-result').classList.add('hidden');
+        // Clear signatures on reset
+        if (this.sigEmp) this.sigEmp.clear();
+        if (this.sigResp) this.sigResp.clear();
     },
 
     reset() {
@@ -786,8 +807,8 @@ const ReturnsModule = {
         const c = document.getElementById('devoluciones-table-container');
         if (data.length === 0) { c.innerHTML = '<p class="loading-text">No hay devoluciones registradas.</p>'; return; }
 
-        let h = '<table><thead><tr><th>ID</th><th>Fecha</th><th>Empleado</th><th>SKU</th><th>Cant</th><th>Estado</th><th>Por</th><th>Notas</th></tr></thead><tbody>';
-        data.forEach(d => {
+        let h = '<table><thead><tr><th>ID</th><th>Fecha</th><th>Empleado</th><th>SKU</th><th>Cant</th><th>Estado</th><th>Por</th><th>PDF</th></tr></thead><tbody>';
+        data.forEach((d, idx) => {
             const condBadge = d.EstadoItem === 'Bueno' ? 'badge-success' : d.EstadoItem === 'Regular' ? 'badge-warning' : 'badge-danger';
             h += `<tr>
         <td>${d.ID_Devolucion}</td>
@@ -797,7 +818,7 @@ const ReturnsModule = {
         <td>${d.CantidadDevuelta}</td>
         <td><span class="badge ${condBadge}">${d.EstadoItem}</span></td>
         <td>${d.ProcesadoPor}</td>
-        <td>${d.Notas || '-'}</td>
+        <td><button class="btn-edit" onclick="ReturnsModule.downloadHistoryPDF(${idx})">📄 PDF</button></td>
       </tr>`;
         });
         h += '</tbody></table>';
@@ -843,37 +864,16 @@ const ReturnsModule = {
         document.getElementById('dev-condition').value = 'Bueno';
         document.getElementById('dev-notes').value = '';
         document.getElementById('dev-form-container').classList.remove('hidden');
+
+        // Inicializar firmas para devolución
+        setTimeout(() => {
+            this.sigEmp = new SignaturePad('sig-dev-empleado');
+            this.sigResp = new SignaturePad('sig-dev-responsable');
+            document.getElementById('clear-sig-dev-emp').onclick = () => this.sigEmp?.clear();
+            document.getElementById('clear-sig-dev-resp').onclick = () => this.sigResp?.clear();
+        }, 200);
     },
 
     async processReturn() {
         const payload = {
             asigOriginalId: document.getElementById('dev-asig-id').value,
-            employeeId: this.employeeId,
-            sku: document.getElementById('dev-sku').value,
-            quantityReturned: parseInt(document.getElementById('dev-quantity').value) || 1,
-            itemCondition: document.getElementById('dev-condition').value,
-            notes: document.getElementById('dev-notes').value
-        };
-
-        showLoader('Procesando devolución...');
-        const result = await api.request('processReturn', payload);
-        hideLoader();
-
-        if (result && result.success) {
-            document.getElementById('dev-result-msg').textContent = result.message;
-            document.getElementById('dev-form-container').classList.add('hidden');
-            document.getElementById('dev-assignments').classList.add('hidden');
-            document.getElementById('dev-result').classList.remove('hidden');
-            showToast(result.message);
-            api.invalidateCache();
-            this.loadHistory(); // Refresh history
-        } else {
-            showToast(result?.message || 'Error.', 'error');
-        }
-    }
-};
-
-// ===================================================================
-// INIT
-// ===================================================================
-document.addEventListener('DOMContentLoaded', () => App.init());

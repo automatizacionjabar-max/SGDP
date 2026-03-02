@@ -330,89 +330,86 @@
             <div id="page-asignaciones" class="page-content hidden">
                 <div class="page-header">
                     <h3>Asignación de EPP</h3>
+                    <button id="btn-toggle-asig-form" class="btn btn-primary btn-sm">+ Nueva Asignación</button>
                 </div>
-                <div class="assignment-flow glass-card">
-                    <!-- Step 1: Buscar Empleado -->
-                    <div id="asig-step-1" class="asig-step">
-                        <h4>Paso 1: Identificar Empleado</h4>
-                        <div class="input-row">
-                            <input type="text" id="asig-emp-id" placeholder="Ingrese cédula del empleado"
-                                class="search-input">
-                            <button id="asig-search-btn" class="btn btn-primary btn-sm">Buscar</button>
+
+                <!-- Assignment Form (collapsible) -->
+                <div id="asig-form-wrapper" class="hidden">
+                    <div class="assignment-flow glass-card">
+                        <!-- Step 1: Buscar Empleado -->
+                        <div id="asig-step-1" class="asig-step">
+                            <h4>Paso 1: Identificar Empleado</h4>
+                            <div class="input-row">
+                                <input type="text" id="asig-emp-id" placeholder="Ingrese cédula del empleado"
+                                    class="search-input">
+                                <button id="asig-search-btn" class="btn btn-primary btn-sm">Buscar</button>
+                            </div>
+                            <div id="asig-emp-info" class="info-card hidden">
+                                <p><strong>Nombre:</strong> <span id="asig-emp-name">-</span></p>
+                                <p><strong>Cargo:</strong> <span id="asig-emp-cargo">-</span></p>
+                                <p><strong>Área:</strong> <span id="asig-emp-area">-</span></p>
+                            </div>
                         </div>
-                        <div id="asig-emp-info" class="info-card hidden">
-                            <p><strong>Nombre:</strong> <span id="asig-emp-name">-</span></p>
-                            <p><strong>Cargo:</strong> <span id="asig-emp-cargo">-</span></p>
-                            <p><strong>Área:</strong> <span id="asig-emp-area">-</span></p>
+                        <!-- Step 2: Seleccionar EPP -->
+                        <div id="asig-step-2" class="asig-step hidden">
+                            <h4>Paso 2: Seleccionar EPP</h4>
+                            <div class="form-grid">
+                                <div class="input-group"><label for="asig-item">Artículo</label><select id="asig-item">
+                                        <option value="">Seleccione...</option>
+                                    </select></div>
+                                <div class="input-group"><label for="asig-quantity">Cantidad</label><input type="number"
+                                        id="asig-quantity" min="1" value="1"></div>
+                                <div class="input-group"><label for="asig-delivery-type">Tipo Entrega</label><select
+                                        id="asig-delivery-type">
+                                        <option value="Dotación">Dotación</option>
+                                        <option value="Reposición">Reposición</option>
+                                        <option value="Emergencia">Emergencia</option>
+                                    </select></div>
+                                <div class="input-group"><label for="asig-due-date">Próximo Vencimiento</label><input
+                                        type="date" id="asig-due-date"></div>
+                                <div class="input-group full-width"><label for="asig-notes">Notas</label><textarea
+                                        id="asig-notes" rows="2" placeholder="Observaciones..."></textarea></div>
+                            </div>
+                        </div>
+                        <!-- Step 3: Firmas -->
+                        <div id="asig-step-3" class="asig-step hidden">
+                            <h4>Paso 3: Firmas Digitales</h4>
+                            <div class="signatures-grid">
+                                <div class="signature-box"><label>Firma del Empleado</label><canvas id="sig-empleado"
+                                        class="signature-canvas" width="350" height="150"></canvas><button type="button"
+                                        class="btn btn-secondary btn-xs" id="clear-sig-emp">Limpiar</button></div>
+                                <div class="signature-box"><label>Firma del Responsable SST</label><canvas
+                                        id="sig-responsable" class="signature-canvas" width="350"
+                                        height="150"></canvas><button type="button" class="btn btn-secondary btn-xs"
+                                        id="clear-sig-resp">Limpiar</button></div>
+                            </div>
+                        </div>
+                        <!-- Actions -->
+                        <div class="asig-actions">
+                            <button id="asig-prev-btn" class="btn btn-secondary hidden">← Anterior</button>
+                            <button id="asig-next-btn" class="btn btn-primary hidden">Siguiente →</button>
+                            <button id="asig-save-btn" class="btn btn-success hidden">✅ Guardar Asignación</button>
                         </div>
                     </div>
-
-                    <!-- Step 2: Seleccionar EPP -->
-                    <div id="asig-step-2" class="asig-step hidden">
-                        <h4>Paso 2: Seleccionar EPP</h4>
-                        <div class="form-grid">
-                            <div class="input-group">
-                                <label for="asig-item">Artículo</label>
-                                <select id="asig-item">
-                                    <option value="">Seleccione...</option>
-                                </select>
-                            </div>
-                            <div class="input-group">
-                                <label for="asig-quantity">Cantidad</label>
-                                <input type="number" id="asig-quantity" min="1" value="1">
-                            </div>
-                            <div class="input-group">
-                                <label for="asig-delivery-type">Tipo Entrega</label>
-                                <select id="asig-delivery-type">
-                                    <option value="Dotación">Dotación</option>
-                                    <option value="Reposición">Reposición</option>
-                                    <option value="Emergencia">Emergencia</option>
-                                </select>
-                            </div>
-                            <div class="input-group">
-                                <label for="asig-due-date">Próximo Vencimiento</label>
-                                <input type="date" id="asig-due-date">
-                            </div>
-                            <div class="input-group full-width">
-                                <label for="asig-notes">Notas</label>
-                                <textarea id="asig-notes" rows="2" placeholder="Observaciones..."></textarea>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Step 3: Firmas -->
-                    <div id="asig-step-3" class="asig-step hidden">
-                        <h4>Paso 3: Firmas Digitales</h4>
-                        <div class="signatures-grid">
-                            <div class="signature-box">
-                                <label>Firma del Empleado</label>
-                                <canvas id="sig-empleado" class="signature-canvas" width="350" height="150"></canvas>
-                                <button type="button" class="btn btn-secondary btn-xs"
-                                    id="clear-sig-emp">Limpiar</button>
-                            </div>
-                            <div class="signature-box">
-                                <label>Firma del Responsable SST</label>
-                                <canvas id="sig-responsable" class="signature-canvas" width="350" height="150"></canvas>
-                                <button type="button" class="btn btn-secondary btn-xs"
-                                    id="clear-sig-resp">Limpiar</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Actions -->
-                    <div class="asig-actions">
-                        <button id="asig-prev-btn" class="btn btn-secondary hidden">← Anterior</button>
-                        <button id="asig-next-btn" class="btn btn-primary hidden">Siguiente →</button>
-                        <button id="asig-save-btn" class="btn btn-success hidden">✅ Guardar Asignación</button>
+                    <!-- Assignment Result -->
+                    <div id="asig-result" class="glass-card hidden" style="padding:20px;margin-top:12px;">
+                        <h4>✅ Asignación Registrada</h4>
+                        <p id="asig-result-msg"></p>
+                        <button id="asig-download-pdf" class="btn btn-primary btn-sm">📄 Descargar Recibo PDF</button>
+                        <button id="asig-new-btn" class="btn btn-secondary btn-sm">+ Nueva Asignación</button>
                     </div>
                 </div>
 
-                <!-- Assignment Result -->
-                <div id="asig-result" class="glass-card hidden">
-                    <h4>✅ Asignación Registrada</h4>
-                    <p id="asig-result-msg"></p>
-                    <button id="asig-download-pdf" class="btn btn-primary btn-sm">📄 Descargar Recibo PDF</button>
-                    <button id="asig-new-btn" class="btn btn-secondary btn-sm">+ Nueva Asignación</button>
+                <!-- HISTORIAL DE ASIGNACIONES -->
+                <div class="page-header" style="margin-top:20px;">
+                    <h3>📋 Historial de Asignaciones</h3>
+                </div>
+                <div class="search-bar">
+                    <input type="text" id="search-asignaciones" placeholder="🔍 Buscar por ID, cédula o SKU..."
+                        class="search-input">
+                </div>
+                <div id="asignaciones-table-container" class="table-responsive">
+                    <p class="loading-text">Cargando historial...</p>
                 </div>
             </div>
 
@@ -420,64 +417,63 @@
             <div id="page-devoluciones" class="page-content hidden">
                 <div class="page-header">
                     <h3>Devolución de EPP</h3>
+                    <button id="btn-toggle-dev-form" class="btn btn-primary btn-sm">+ Nueva Devolución</button>
                 </div>
-                <div class="return-flow glass-card">
-                    <!-- Step 1: Buscar empleado -->
-                    <div class="input-row">
-                        <input type="text" id="dev-emp-id" placeholder="Ingrese cédula del empleado"
-                            class="search-input">
-                        <button id="dev-search-btn" class="btn btn-primary btn-sm">Buscar Asignaciones</button>
-                    </div>
 
-                    <!-- Step 2: Asignaciones previas -->
-                    <div id="dev-assignments" class="hidden">
-                        <h4>Asignaciones del Empleado</h4>
-                        <div id="dev-assignments-list" class="table-responsive"></div>
-                    </div>
-
-                    <!-- Step 3: Formulario de devolución -->
-                    <div id="dev-form-container" class="hidden">
-                        <h4>Registrar Devolución</h4>
-                        <div class="form-grid">
-                            <div class="input-group">
-                                <label>ID Asignación</label>
-                                <input type="text" id="dev-asig-id" readonly>
+                <!-- Return Form (collapsible) -->
+                <div id="dev-form-wrapper" class="hidden">
+                    <div class="return-flow glass-card">
+                        <div class="input-row">
+                            <input type="text" id="dev-emp-id" placeholder="Ingrese cédula del empleado"
+                                class="search-input">
+                            <button id="dev-search-btn" class="btn btn-primary btn-sm">Buscar Asignaciones</button>
+                        </div>
+                        <div id="dev-assignments" class="hidden">
+                            <h4>Asignaciones del Empleado</h4>
+                            <div id="dev-assignments-list" class="table-responsive"></div>
+                        </div>
+                        <div id="dev-form-container" class="hidden">
+                            <h4>Registrar Devolución</h4>
+                            <div class="form-grid">
+                                <div class="input-group"><label>ID Asignación</label><input type="text" id="dev-asig-id"
+                                        readonly></div>
+                                <div class="input-group"><label>SKU</label><input type="text" id="dev-sku" readonly>
+                                </div>
+                                <div class="input-group"><label for="dev-quantity">Cantidad a Devolver</label><input
+                                        type="number" id="dev-quantity" min="1" value="1"></div>
+                                <div class="input-group"><label for="dev-condition">Estado del Artículo</label><select
+                                        id="dev-condition">
+                                        <option value="Bueno">Bueno</option>
+                                        <option value="Regular">Regular</option>
+                                        <option value="Dañado">Dañado</option>
+                                    </select></div>
+                                <div class="input-group full-width"><label for="dev-notes">Notas</label><textarea
+                                        id="dev-notes" rows="2"
+                                        placeholder="Observaciones sobre el estado del EPP..."></textarea></div>
                             </div>
-                            <div class="input-group">
-                                <label>SKU</label>
-                                <input type="text" id="dev-sku" readonly>
-                            </div>
-                            <div class="input-group">
-                                <label for="dev-quantity">Cantidad a Devolver</label>
-                                <input type="number" id="dev-quantity" min="1" value="1">
-                            </div>
-                            <div class="input-group">
-                                <label for="dev-condition">Estado del Artículo</label>
-                                <select id="dev-condition">
-                                    <option value="Bueno">Bueno</option>
-                                    <option value="Regular">Regular</option>
-                                    <option value="Dañado">Dañado</option>
-                                </select>
-                            </div>
-                            <div class="input-group full-width">
-                                <label for="dev-notes">Notas</label>
-                                <textarea id="dev-notes" rows="2"
-                                    placeholder="Observaciones sobre el estado del EPP..."></textarea>
+                            <div class="form-actions"><button id="dev-save-btn" class="btn btn-primary">Procesar
+                                    Devolución</button></div>
+                        </div>
+                        <div id="dev-result" class="hidden">
+                            <div class="success-message">
+                                <h4>✅ Devolución Registrada</h4>
+                                <p id="dev-result-msg"></p>
+                                <button id="dev-new-btn" class="btn btn-secondary btn-sm">+ Nueva Devolución</button>
                             </div>
                         </div>
-                        <div class="form-actions">
-                            <button id="dev-save-btn" class="btn btn-primary">Procesar Devolución</button>
-                        </div>
                     </div>
+                </div>
 
-                    <!-- Result -->
-                    <div id="dev-result" class="hidden">
-                        <div class="success-message">
-                            <h4>✅ Devolución Registrada</h4>
-                            <p id="dev-result-msg"></p>
-                            <button id="dev-new-btn" class="btn btn-secondary btn-sm">+ Nueva Devolución</button>
-                        </div>
-                    </div>
+                <!-- HISTORIAL DE DEVOLUCIONES -->
+                <div class="page-header" style="margin-top:20px;">
+                    <h3>🔄 Historial de Devoluciones</h3>
+                </div>
+                <div class="search-bar">
+                    <input type="text" id="search-devoluciones" placeholder="🔍 Buscar por ID, cédula o SKU..."
+                        class="search-input">
+                </div>
+                <div id="devoluciones-table-container" class="table-responsive">
+                    <p class="loading-text">Cargando historial...</p>
                 </div>
             </div>
 

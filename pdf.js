@@ -3,7 +3,12 @@
  * Genera recibos de asignación usando jsPDF
  */
 
-function generateAssignmentPDF(data) {
+function generateAssignmentPDF(data, returnBase64 = false) {
+    if (!window.jspdf) {
+        console.error('jsPDF no cargó correctamente.');
+        alert('Error: La librería PDF no está disponible. Revisa tu internet o el CDN.');
+        return null;
+    }
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('p', 'mm', 'letter');
 
@@ -127,7 +132,13 @@ function generateAssignmentPDF(data) {
     doc.text(`ID: ${data.employee_id || ''}`, leftSigX + sigWidth / 2, y, { align: 'center' });
     doc.text(data.current_user_email || '', rightSigX + sigWidth / 2, y, { align: 'center' });
 
-    // ===== SAVE =====
+    // ===== SAVE OR RETURN =====
     const filename = `Recibo_${data.asig_id || 'EPP'}_${data.employee_id || ''}.pdf`;
-    doc.save(filename);
+
+    if (returnBase64) {
+        return doc.output('datauristring').split(',')[1];
+    } else {
+        doc.save(filename);
+        return true;
+    }
 }

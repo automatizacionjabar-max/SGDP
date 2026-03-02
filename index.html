@@ -163,6 +163,12 @@
                 <div id="empleados-table-container" class="table-responsive">
                     <p class="loading-text">Cargando empleados...</p>
                 </div>
+                <!-- Pagination Controls -->
+                <div class="pagination-container" id="empleados-pagination">
+                    <button id="emp-prev-page" class="btn btn-secondary btn-xs" disabled>Anterior</button>
+                    <span id="emp-page-info">Página 1</span>
+                    <button id="emp-next-page" class="btn btn-secondary btn-xs">Siguiente</button>
+                </div>
 
                 <!-- Modal Nuevo/Editar Empleado -->
                 <div id="modal-empleado" class="modal hidden">
@@ -200,6 +206,12 @@
                                 <div class="input-group">
                                     <label for="emp-sede">Sede</label>
                                     <select id="emp-sede">
+                                        <option value="">Cargando...</option>
+                                    </select>
+                                </div>
+                                <div class="input-group">
+                                    <label for="emp-empresa">Empresa</label>
+                                    <select id="emp-empresa">
                                         <option value="">Cargando...</option>
                                     </select>
                                 </div>

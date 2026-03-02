@@ -861,4 +861,3 @@ const ReturnsModule = {
 // INIT
 // ===================================================================
 document.addEventListener('DOMContentLoaded', () => App.init());
-

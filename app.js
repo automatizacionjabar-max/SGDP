@@ -343,10 +343,17 @@ const EmpleadosModule = {
         }
 
         document.getElementById('empleados-pagination').classList.remove('hidden');
-        let h = '<table><thead><tr><th>Cédula</th><th>Nombres</th><th>Apellidos</th><th>Cargo</th><th>Área</th><th>Sede</th><th>Estado</th><th>Acción</th></tr></thead><tbody>';
+        let h = '<table class="data-table"><thead><tr><th>ID</th><th>Nombres</th><th>Cargo</th><th>Sede</th><th>Acciones</th></tr></thead><tbody>';
         pageItems.forEach(emp => {
-            const estado = emp['Estado'] === 'Activo' ? '<span class="badge badge-success">Activo</span>' : '<span class="badge badge-danger">Inactivo</span>';
-            h += `<tr><td>${emp['ID_Empleado'] || ''}</td><td>${emp['Nombres'] || ''}</td><td>${emp['Apellidos'] || ''}</td><td>${emp['Cargo'] || ''}</td><td>${emp['Area'] || ''}</td><td>${emp['SedePorcicola'] || ''}</td><td>${estado}</td><td><button class="btn-edit" onclick="EmpleadosModule.openEdit(${emp._rowIndex})">Editar</button></td></tr>`;
+            h += `<tr>
+                <td>${emp['ID_Empleado'] || ''}</td>
+                <td>${emp['Nombres'] || ''} ${emp['Apellidos'] || ''}</td>
+                <td>${emp['Cargo'] || ''}</td>
+                <td>${emp['SedePorcicola'] || ''}</td>
+                <td>
+                    <button class="btn btn-primary btn-xs" onclick="EmpleadosModule.openEdit('${emp['ID_Empleado']}')">Editar</button>
+                </td>
+            </tr>`;
         });
         h += '</tbody></table>';
         c.innerHTML = h;
@@ -399,28 +406,31 @@ const EmpleadosModule = {
         openModal('modal-empleado');
     },
 
-    async openEdit(rowIndex) {
-        const emp = this.data.find(e => e._rowIndex === rowIndex);
-        if (!emp) return;
+    async openEdit(id) {
+        const emp = this.data.find(e => String(e['ID_Empleado']) === String(id));
+        if (!emp) {
+            showToast('No se encontró el empleado para editar.', 'error');
+            return;
+        }
+
         document.getElementById('modal-empleado-title').textContent = 'Editar Empleado';
-        document.getElementById('emp-edit-index').value = rowIndex;
+        document.getElementById('emp-edit-index').value = emp._rowIndex;
         document.getElementById('emp-cedula').value = emp['ID_Empleado'] || '';
         document.getElementById('emp-cedula').disabled = true;
         document.getElementById('emp-nombres').value = emp['Nombres'] || '';
         document.getElementById('emp-apellidos').value = emp['Apellidos'] || '';
         document.getElementById('emp-fecha').value = emp['FechaIngreso'] || '';
         document.getElementById('emp-estado').value = emp['Estado'] || 'Activo';
-        document.getElementById('emp-consentimiento').value = emp['ConsentimientoLey1581'] || 'Sí';
-        const opt = await this.loadOptions(); // Load options and get the result
+        document.getElementById('emp-consentimiento').value = emp['ConsentimientoLey1581'] || 'Aceptado';
+
+        // Cargar opciones solo si es necesario
+        if (!this.optionsCache) await this.loadOptions();
+
         document.getElementById('emp-cargo').value = emp['Cargo'] || '';
-        if (opt) { // Ensure opt is available before using it
-            document.getElementById('emp-area').innerHTML = '<option value="">Seleccione...</option>' + opt.areas.map(v => `<option value="${v}">${v}</option>`).join('');
-            document.getElementById('emp-sede').innerHTML = '<option value="">Seleccione...</option>' + opt.sedes.map(v => `<option value="${v}">${v}</option>`).join('');
-            document.getElementById('emp-empresa').innerHTML = '<option value="">Seleccione...</option>' + opt.empresas.map(v => `<option value="${v}">${v}</option>`).join('');
-        }
         document.getElementById('emp-area').value = emp['Area'] || '';
         document.getElementById('emp-sede').value = emp['SedePorcicola'] || '';
         document.getElementById('emp-empresa').value = emp['Empresa'] || '';
+
         openModal('modal-empleado');
     },
 
@@ -441,18 +451,22 @@ const EmpleadosModule = {
 
     async save() {
         const editIdx = document.getElementById('emp-edit-index').value;
+        // ORDEN HOJA EMPLEADOS (Imagen): 
+        // A:ID, B:Nombres, C:Apellidos, D:Cargo, E:Area, F:Sede, G:Empresa, H:Fecha, I:Estado, J:Consentimiento
         const datos = [
             document.getElementById('emp-cedula').value.trim(),
             document.getElementById('emp-nombres').value.trim(),
-            document.getElementById('emp-apellidos').value,
+            document.getElementById('emp-apellidos').value.trim(),
             document.getElementById('emp-cargo').value,
             document.getElementById('emp-area').value,
             document.getElementById('emp-sede').value,
-            document.getElementById('emp-empresa').value,
-            document.getElementById('emp-fecha').value,
-            document.getElementById('emp-estado').value,
-            document.getElementById('emp-consentimiento').value
+            document.getElementById('emp-empresa').value, // G: Empresa (NUEVO ORDEN)
+            document.getElementById('emp-fecha').value,   // H: FechaIngreso
+            document.getElementById('emp-estado').value,  // I: Estado
+            document.getElementById('emp-consentimiento').value // J: Consentimiento
         ];
+        // Nota: El orden exacto debe ser ID, Nombres, Apellidos, Cargo, Area, Sede, Fecha, Estado, Consentimiento, Empresa
+        // (Verificar con el usuario si Empresa es la última o una posición específica tras G)
         showLoader('Guardando...');
         const result = editIdx
             ? await api.request('actualizarEmpleado', { index: parseInt(editIdx), datos })
@@ -526,7 +540,7 @@ const InventarioModule = {
         document.getElementById('inv-ubicacion').value = item['Ubicacion'] || '';
         await this.loadOptions();
         document.getElementById('inv-tipo').value = item['Tipo'] || '';
-        document.getElementById('inv-unidad').value = item['Unidad'] || '';
+        document.getElementById('inv-unidad').value = item['UnidadMedida'] || item['Unidad'] || '';
         document.getElementById('inv-proveedor').value = item['Proveedor'] || '';
         openModal('modal-inventario');
     },
@@ -538,6 +552,7 @@ const InventarioModule = {
 
     async save() {
         const editIdx = document.getElementById('inv-edit-index').value;
+        // ORDEN CRITICO: SKU, Nombre, Descripción, Tipo, StockActual, StockMinimo, Unidad, Vencimiento, Proveedor, Costo, StockMant, StockBaja, Ubicación
         const datos = [
             document.getElementById('inv-sku').value.trim().toUpperCase(),
             document.getElementById('inv-nombre').value.trim(),
@@ -559,7 +574,10 @@ const InventarioModule = {
             : await api.request('crearArticulo', { datos });
         hideLoader();
         if (result && result.success) {
-            showToast(result.message); closeModal('modal-inventario'); api.invalidateCache(); this.load();
+            showToast(result.message);
+            closeModal('modal-inventario');
+            api.invalidateCache();
+            setTimeout(() => this.load(), 500); // Dar un respiro a la cache del lado del servidor
         } else { showToast(result?.message || 'Error al guardar.', 'error'); }
     }
 };
@@ -608,8 +626,9 @@ const AssignmentsModule = {
         document.querySelectorAll('.asig-actions').forEach(el => el.classList.remove('hidden'));
 
         setTimeout(() => {
-            this.sigEmp = new SignaturePad('sig-empleado');
-            this.sigResp = new SignaturePad('sig-responsable');
+            const sigOptions = { penColor: "rgb(0, 0, 0)", minWidth: 0.5, maxWidth: 2.5 };
+            this.sigEmp = new SignaturePad(document.getElementById('sig-empleado'), sigOptions);
+            this.sigResp = new SignaturePad(document.getElementById('sig-responsable'), sigOptions);
             document.getElementById('clear-sig-emp').onclick = () => this.sigEmp?.clear();
             document.getElementById('clear-sig-resp').onclick = () => this.sigResp?.clear();
         }, 100);
@@ -842,6 +861,16 @@ const ReturnsModule = {
         // Clear signatures on reset
         if (this.sigEmp) this.sigEmp.clear();
         if (this.sigResp) this.sigResp.clear();
+
+        setTimeout(() => {
+            const sigOptions = { penColor: "rgb(0, 0, 0)", minWidth: 0.5, maxWidth: 2.5 };
+            const canvasEmp = document.getElementById('dev-sig-empleado');
+            const canvasResp = document.getElementById('dev-sig-responsable');
+            if (canvasEmp) this.sigEmp = new SignaturePad(canvasEmp, sigOptions);
+            if (canvasResp) this.sigResp = new SignaturePad(canvasResp, sigOptions);
+            document.getElementById('dev-clear-sig-emp').onclick = () => this.sigEmp?.clear();
+            document.getElementById('dev-clear-sig-resp').onclick = () => this.sigResp?.clear();
+        }, 100);
     },
 
     reset() {
@@ -924,8 +953,11 @@ const ReturnsModule = {
 
         // Inicializar firmas para devolución
         setTimeout(() => {
-            this.sigEmp = new SignaturePad('sig-dev-empleado');
-            this.sigResp = new SignaturePad('sig-dev-responsable');
+            const sigOptions = { penColor: "rgb(0, 0, 0)", minWidth: 0.5, maxWidth: 2.5 };
+            const canvasEmp = document.getElementById('sig-dev-empleado');
+            const canvasResp = document.getElementById('sig-dev-responsable');
+            if (canvasEmp) this.sigEmp = new SignaturePad(canvasEmp, sigOptions);
+            if (canvasResp) this.sigResp = new SignaturePad(canvasResp, sigOptions);
             document.getElementById('clear-sig-dev-emp').onclick = () => this.sigEmp?.clear();
             document.getElementById('clear-sig-dev-resp').onclick = () => this.sigResp?.clear();
         }, 200);
@@ -948,43 +980,34 @@ const ReturnsModule = {
         hideLoader();
 
         if (result && result.success) {
-            const condition = document.getElementById('dev-condition').value;
-            const empId = document.getElementById('dev-emp-id').value;
+            // El servidor ya devuelve employee_name, company, item_name, etc.
+            const row = result;
+            row.signature_emp_b64 = this.sigEmp ? this.sigEmp.toBase64() : '';
+            row.signature_resp_b64 = this.sigResp ? this.sigResp.toBase64() : '';
 
-            // Datos para el PDF
-            const pdfData = {
-                dev_id: result.dev_id || 'DEV-TEMP',
-                timestamp: new Date().toLocaleString(),
-                employee_id: empId,
-                employee_name: '', // Podríamos buscarlo en el cache de empleados
-                sku: payload.sku,
-                item_name: 'EPP', // Sería ideal obtenerlo del objeto original
-                quantity: payload.quantityReturned,
-                item_condition: condition,
-                company: '', // Sería ideal obtenerlo del empleado
-                current_user_email: api.getUser()?.email,
-                signature_emp_b64: this.sigEmp ? this.sigEmp.toBase64() : '',
-                signature_resp_b64: this.sigResp ? this.sigResp.toBase64() : ''
-            };
-
-            // Generar PDF correspondiente
+            // Generar PDF correspondiente con datos completos
             let pdfBase64 = null;
-            if (condition === 'Bueno') {
-                pdfBase64 = generateReturnPDF(pdfData, true);
-                generateReturnPDF(pdfData); // Descarga local
+            if (row.item_condition === 'Bueno') {
+                pdfBase64 = generateReturnPDF(row, true);
+                generateReturnPDF(row);
             } else {
-                pdfBase64 = generateDisposalPDF(pdfData, true);
-                generateDisposalPDF(pdfData); // Descarga local
+                pdfBase64 = generateDisposalPDF(row, true);
+                generateDisposalPDF(row);
             }
 
             // Respaldo en Drive
             if (pdfBase64) {
                 api.request('savePdfToDrive', {
                     pdfBase64: pdfBase64,
-                    filename: `${condition === 'Bueno' ? 'Devolucion' : 'Acta_Eliminacion'}_${pdfData.dev_id}.pdf`,
+                    filename: `${row.item_condition === 'Bueno' ? 'Devolucion' : 'Acta_Eliminacion'}_${row.dev_id}.pdf`,
                     folderId: DRIVE_FOLDER_ID
                 });
             }
+
+            document.getElementById('dev-result-msg').textContent = result.message;
+            document.getElementById('dev-result').classList.remove('hidden');
+            document.getElementById('dev-form-container').classList.add('hidden');
+            document.getElementById('dev-assignments').classList.add('hidden');
 
             showToast(result.message);
             this.reset();

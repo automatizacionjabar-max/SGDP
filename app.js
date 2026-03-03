@@ -836,6 +836,8 @@ const AssignmentsModule = {
 
     downloadPDF() {
         if (this.lastAssignmentData) {
+            const user = api.getUser();
+            this.lastAssignmentData.responsible_name = user.Nombre || user.Email || 'Responsable SST';
             generateAssignmentPDF(this.lastAssignmentData);
             showToast('PDF descargado');
         }
@@ -908,15 +910,15 @@ const ReturnsModule = {
 
         let h = '<table><thead><tr><th>ID</th><th>Fecha</th><th>Empleado</th><th>SKU</th><th>Cant</th><th>Estado</th><th>Por</th><th>PDF</th></tr></thead><tbody>';
         data.forEach((d, idx) => {
-            const condBadge = d.EstadoItem === 'Bueno' ? 'badge-success' : d.EstadoItem === 'Regular' ? 'badge-warning' : 'badge-danger';
+            const condBadge = d.item_condition === 'Bueno' ? 'badge-success' : d.item_condition === 'Regular' ? 'badge-warning' : 'badge-danger';
             h += `<tr>
-        <td>${d.ID_Devolucion}</td>
-        <td>${d.Timestamp}</td>
-        <td>${d.ID_Empleado}</td>
-        <td>${d.SKU}</td>
-        <td>${d.CantidadDevuelta}</td>
-        <td><span class="badge ${condBadge}">${d.EstadoItem}</span></td>
-        <td>${d.ProcesadoPor}</td>
+        <td>${d.dev_id}</td>
+        <td>${d.timestamp}</td>
+        <td>${d.employee_id}</td>
+        <td>${d.sku}</td>
+        <td>${d.quantity}</td>
+        <td><span class="badge ${condBadge}">${d.item_condition}</span></td>
+        <td>${d.current_user_email}</td>
         <td><button class="btn-edit" onclick="ReturnsModule.downloadHistoryPDF(${idx})">📄 PDF</button></td>
       </tr>`;
         });
@@ -964,15 +966,17 @@ const ReturnsModule = {
         document.getElementById('dev-notes').value = '';
         document.getElementById('dev-form-container').classList.remove('hidden');
 
-        // Inicializar firmas para devolución
+        // Initialize signature pads
         setTimeout(() => {
-            const sigOptions = { penColor: "rgb(0, 0, 0)", minWidth: 0.5, maxWidth: 2.5 };
-            const canvasEmp = document.getElementById('sig-dev-empleado');
-            const canvasResp = document.getElementById('sig-dev-responsable');
-            if (canvasEmp) this.sigEmp = new SignaturePad(canvasEmp, sigOptions);
-            if (canvasResp) this.sigResp = new SignaturePad(canvasResp, sigOptions);
-            document.getElementById('clear-sig-dev-emp').onclick = () => this.sigEmp?.clear();
-            document.getElementById('clear-sig-dev-resp').onclick = () => this.sigResp?.clear();
+            const canvasEmp = document.getElementById('sig-dev-emp');
+            const canvasResp = document.getElementById('sig-dev-resp');
+            const options = { penColor: "rgb(26, 35, 126)", minWidth: 0.5, maxWidth: 3.0 };
+
+            this.sigEmp = canvasEmp ? new SignaturePad(canvasEmp, options) : null;
+            this.sigResp = canvasResp ? new SignaturePad(canvasResp, options) : null;
+
+            if (this.sigEmp) document.getElementById('clear-sig-dev-emp').onclick = () => this.sigEmp.clear();
+            if (this.sigResp) document.getElementById('clear-sig-dev-resp').onclick = () => this.sigResp.clear();
         }, 200);
     },
 
@@ -984,8 +988,8 @@ const ReturnsModule = {
             quantityReturned: parseInt(document.getElementById('dev-quantity').value) || 1,
             itemCondition: document.getElementById('dev-condition').value,
             notes: document.getElementById('dev-notes').value,
-            signatureEmpB64: this.sigEmp ? this.sigEmp.toBase64Raw() : '',
-            signatureRespB64: this.sigResp ? this.sigResp.toBase64Raw() : ''
+            signatureEmpB64: this.sigEmp && !this.sigEmp.isEmpty() ? this.sigEmp.toBase64Raw() : '',
+            signatureRespB64: this.sigResp && !this.sigResp.isEmpty() ? this.sigResp.toBase64Raw() : ''
         };
 
         showLoader('Procesando devolución...');
@@ -999,6 +1003,9 @@ const ReturnsModule = {
             row.signature_resp_b64 = this.sigResp ? this.sigResp.toBase64() : '';
 
             // Generar PDF correspondiente con datos completos
+            const user = api.getUser();
+            row.responsible_name = user.Nombre || user.Email || 'Responsable SST';
+
             let pdfBase64 = null;
             if (row.item_condition === 'Bueno') {
                 pdfBase64 = generateReturnPDF(row, true);
@@ -1047,12 +1054,16 @@ const ReturnsModule = {
             quantity: d.quantity,
             item_condition: d.item_condition,
             current_user_email: d.current_user_email,
+            responsible_name: d.employee_name, // Placeholder or fetch if possible
             signature_emp_b64: d.signature_emp_b64,
             signature_resp_b64: d.signature_resp_b64,
             notes: d.notes || ''
         };
 
-        if (d.EstadoItem === 'Bueno') {
+        const user = api.getUser();
+        pdfData.responsible_name = user.Nombre || user.Email || 'Responsable SST';
+
+        if (d.item_condition === 'Bueno') {
             generateReturnPDF(pdfData);
         } else {
             generateDisposalPDF(pdfData);
@@ -1167,8 +1178,10 @@ const DisposalModule = {
             closeModal('modal-disposicion');
 
             // Generar PDF del Acta
+            const user = api.getUser();
             const pdfData = result.data;
             pdfData.signature_resp_b64 = this.sigResp.toBase64();
+            pdfData.responsible_name = user.Nombre || user.Email || 'Responsable SST';
             generateDisposalPDF(pdfData);
 
             api.invalidateCache();

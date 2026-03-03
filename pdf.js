@@ -64,7 +64,7 @@ function generateAssignmentPDF(data, returnBase64 = false) {
     const row1 = [
         { label: "ID ASIGNACIÓN", value: data.asig_id || 'N/A' },
         { label: "FECHA Y HORA", value: data.timestamp || 'N/A' },
-        { label: "RESPONSABLE SST", value: data.current_user_email || 'N/A' }
+        { label: "RESPONSABLE SST", value: data.responsible_name || data.current_user_email || 'N/A' }
     ];
     y = drawInfoCards(doc, row1, margin, y, pageWidth);
     y += 8;
@@ -119,7 +119,7 @@ function generateReturnPDF(data, returnBase64 = false) {
     const row1 = [
         { label: "ID DEVOLUCIÓN", value: data.dev_id || 'N/A' },
         { label: "ESTADO DEL ITEM", value: data.item_condition || 'N/A' },
-        { label: "FECHA PROCESO", value: data.timestamp || 'N/A' }
+        { label: "RESPONSABLE", value: data.responsible_name || data.current_user_email || 'N/A' }
     ];
     y = drawInfoCards(doc, row1, margin, y, pageWidth);
     y += 8;
@@ -138,6 +138,45 @@ function generateReturnPDF(data, returnBase64 = false) {
 
     y = drawSignatures(doc, data, margin, y, pageWidth);
     return finalizePDF(doc, `Devolucion_${data.dev_id}.pdf`, returnBase64);
+}
+
+/**
+ * Genera Acta de Eliminación / Disposición Final
+ */
+function generateDisposalPDF(data, returnBase64 = false) {
+    if (!window.jspdf) return null;
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('p', 'mm', 'letter');
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 15;
+
+    let y = drawHeader(doc, "Acta de Disposición Final de Residuos", data.company, pageWidth);
+
+    y = drawSectionTitle(doc, "INFORMACIÓN DE LA BAJA", margin, y);
+    const row1 = [
+        { label: "MÉTODO", value: data.method || 'ELIMINACIÓN' },
+        { label: "ID PROCESO", value: data.dev_id || data.sku || 'N/A' },
+        { label: "FECHA", value: data.timestamp || 'N/A' }
+    ];
+    y = drawInfoCards(doc, row1, margin, y, pageWidth);
+    y += 8;
+
+    y = drawSectionTitle(doc, "ARTÍCULO ELIMINADO", margin, y);
+    const itemData = [
+        ["ARTÍCULO", "SKU", "CANTIDAD", "UBICACIÓN"],
+        [data.item_name || 'N/A', data.sku || 'N/A', String(data.quantity || '0'), 'ALMACÉN BAJA']
+    ];
+    y = drawTable(doc, itemData, margin, y, pageWidth);
+
+    y += 15;
+    doc.setFontSize(9);
+    const notesText = "OBSERVACIONES: " + (data.notes || "Se procede a la eliminación física del elemento por encontrarse en condiciones no aptas para el servicio.");
+    const splitNotes = doc.splitTextToSize(notesText, pageWidth - margin * 2);
+    doc.text(splitNotes, margin, y);
+    y += splitNotes.length * 5 + 15;
+
+    y = drawSignatures(doc, data, margin, y, pageWidth);
+    return finalizePDF(doc, `Acta_Eliminacion_${data.sku}.pdf`, returnBase64);
 }
 
 // --- COMPONENTES UI PDF ---
@@ -237,7 +276,8 @@ function drawSignatures(doc, data, margin, y, pageWidth) {
     doc.setFont('helvetica', 'bold');
     doc.text("RECIBIDO / DESPACHADO POR", secondX + sigWidth / 2, y + sigHeight + 4, { align: 'center' });
     doc.setFont('helvetica', 'normal');
-    doc.text(String(data.current_user_email || 'SST'), secondX + sigWidth / 2, y + sigHeight + 8, { align: 'center' });
+    // Mostrar nombre completo si existe
+    doc.text(String(data.responsible_name || data.current_user_email || 'SST'), secondX + sigWidth / 2, y + sigHeight + 8, { align: 'center' });
 
     return y + sigHeight + 15;
 }

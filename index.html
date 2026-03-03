@@ -466,8 +466,35 @@
                                         id="dev-notes" rows="2"
                                         placeholder="Observaciones sobre el estado del EPP..."></textarea></div>
                             </div>
-                            <div class="form-actions"><button id="dev-save-btn" class="btn btn-primary">Procesar
-                                    Devolución</button></div>
+
+                            <!-- SIGNS FOR RETURNS -->
+                            <div class="signature-section" style="margin-top: 20px;">
+                                <div class="signature-grid"
+                                    style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                                    <div class="signature-block">
+                                        <label>Firma del Empleado</label>
+                                        <div class="signature-container"
+                                            style="background:white; border:1px solid #ddd; border-radius:4px;">
+                                            <canvas id="sig-dev-emp" class="signature-canvas"
+                                                style="width:100%; height:120px;"></canvas>
+                                            <button type="button" class="btn-clear"
+                                                id="clear-sig-dev-emp">Limpiar</button>
+                                        </div>
+                                    </div>
+                                    <div class="signature-block">
+                                        <label>Firma Responsable SST</label>
+                                        <div class="signature-container">
+                                            <canvas id="sig-dev-resp" class="signature-canvas"></canvas>
+                                            <button type="button" class="btn-clear"
+                                                id="clear-sig-dev-resp">Limpiar</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-actions" style="margin-top:20px;">
+                                <button id="dev-save-btn" class="btn btn-primary btn-full">Procesar Devolución</button>
+                            </div>
                         </div>
                         <div id="dev-result" class="hidden">
                             <div class="success-message">
@@ -489,6 +516,86 @@
                 </div>
                 <div id="devoluciones-table-container" class="table-responsive">
                     <p class="loading-text">Cargando historial...</p>
+                </div>
+            </div>
+
+            <!-- DISPOSICIÓN FINAL PAGE -->
+            <div id="page-disposicion" class="page-content hidden">
+                <div class="page-header">
+                    <h1>🗑️ Disposición Final</h1>
+                    <p>Baja definitiva de elementos en mal estado.</p>
+                </div>
+
+                <div class="card" style="margin-bottom: 20px;">
+                    <p class="info-text">
+                        <span class="icon">ℹ️</span>
+                        A continuación se listan los artículos acumulados en <b>Stock de Baja</b>.
+                        Al procesar la baja, se descontarán definitivamente del sistema y se generará el <b>Acta de
+                            Eliminación</b>.
+                    </p>
+                </div>
+
+                <div id="disposicion-table-container" class="table-responsive">
+                    <p class="loading-text">Buscando elementos...</p>
+                </div>
+
+                <!-- MODAL PARA DISPOSICIÓN -->
+                <div id="modal-disposicion" class="modal-overlay hidden">
+                    <div class="modal-card"
+                        style="max-width: 500px; margin: 20px auto; background: var(--bg-card); padding: 20px; border-radius: 8px;">
+                        <div class="modal-header">
+                            <h3>Acta de Eliminación Definitiva</h3>
+                            <button type="button" class="btn-close-modal" data-modal="modal-disposicion">✕</button>
+                        </div>
+                        <form id="form-disposicion">
+                            <input type="hidden" id="disp-sku">
+                            <div class="input-group">
+                                <label>Artículo</label>
+                                <input type="text" id="disp-item-name" readonly>
+                            </div>
+                            <div class="input-row" style="display: flex; gap: 10px;">
+                                <div class="input-group" style="flex: 1;">
+                                    <label>Disponible</label>
+                                    <input type="text" id="disp-available" readonly
+                                        style="color:var(--danger); font-weight:bold;">
+                                </div>
+                                <div class="input-group" style="flex: 1;">
+                                    <label>Cantidad a Eliminar</label>
+                                    <input type="number" id="disp-quantity" min="1" required>
+                                </div>
+                            </div>
+                            <div class="input-group">
+                                <label>Método de Disposición</label>
+                                <select id="disp-method">
+                                    <option value="Reciclaje">Reciclaje (Puntos Ecológicos)</option>
+                                    <option value="Incineración">Incineración Controlada</option>
+                                    <option value="Relleno Sanitario">Relleno Sanitario</option>
+                                    <option value="Donación">Donación / Uso No SST</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label>Observaciones / Justificación</label>
+                                <textarea id="disp-notes" rows="2"></textarea>
+                            </div>
+
+                            <div class="signature-block" style="margin-top:15px;">
+                                <label>Firma Responsable SST que avala la Baja</label>
+                                <div class="signature-container"
+                                    style="background:white; border:1px solid #ddd; border-radius:4px;">
+                                    <canvas id="sig-disp-resp" class="signature-canvas"
+                                        style="width:100%; height:120px;"></canvas>
+                                    <button type="button" class="btn-clear" id="clear-sig-disp-resp">Limpiar</button>
+                                </div>
+                            </div>
+
+                            <div class="modal-actions"
+                                style="margin-top:20px; display: flex; justify-content: flex-end; gap: 10px;">
+                                <button type="button" class="btn btn-secondary"
+                                    data-modal="modal-disposicion">Cancelar</button>
+                                <button type="submit" class="btn btn-primary">Proceder</button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             </div>
 

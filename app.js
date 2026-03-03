@@ -407,9 +407,11 @@ const EmpleadosModule = {
     },
 
     async openEdit(id) {
-        const emp = this.data.find(e => String(e['ID_Empleado']) === String(id));
+        const searchId = String(id || '').trim();
+        const emp = this.data.find(e => String(e['ID_Empleado'] || '').trim() === searchId);
+
         if (!emp) {
-            showToast('No se encontró el empleado para editar.', 'error');
+            showToast('No se encontró el registro del empleado para editar.', 'error');
             return;
         }
 
@@ -643,11 +645,19 @@ const AssignmentsModule = {
         const c = document.getElementById('asignaciones-table-container');
         c.innerHTML = '<p class="loading-text">Cargando historial...</p>';
 
-        const result = await api.request('getAllAsignaciones', {}, true);
-        if (!result || !result.success) { c.innerHTML = '<p class="loading-text">Error al cargar historial.</p>'; return; }
+        try {
+            const result = await api.request('getAllAsignaciones', {}, true);
+            if (!result || !result.success) {
+                const msg = result ? result.message : 'Sin respuesta del servidor';
+                c.innerHTML = `<p class="loading-text" style="color:var(--danger);">Error: ${msg}</p>`;
+                return;
+            }
 
-        this.historyData = result.data;
-        this.renderHistory(this.historyData);
+            this.historyData = result.data;
+            this.renderHistory(this.historyData);
+        } catch (err) {
+            c.innerHTML = `<p class="loading-text" style="color:var(--danger);">Error crítico: ${err.message}</p>`;
+        }
     },
 
     renderHistory(data) {

@@ -118,10 +118,19 @@ function generateReturnPDF(data, returnBase64 = false) {
     y = drawSectionTitle(doc, "DETALLE DE DEVOLUCIÓN", margin, y);
     const row1 = [
         { label: "ID DEVOLUCIÓN", value: data.dev_id || 'N/A' },
-        { label: "ESTADO DEL ITEM", value: data.item_condition || 'N/A' },
+        { label: "FECHA Y HORA", value: data.timestamp || 'N/A' },
         { label: "RESPONSABLE", value: data.responsible_name || data.current_user_email || 'N/A' }
     ];
     y = drawInfoCards(doc, row1, margin, y, pageWidth);
+    y += 8;
+
+    y = drawSectionTitle(doc, "INFORMACIÓN DEL EMPLEADO", margin, y);
+    const rowEmp = [
+        { label: "NOMBRE COMPLETO", value: (data.employee_name || 'Empleado').toUpperCase() },
+        { label: "CÉDULA / ID", value: data.employee_id || 'N/A' },
+        { label: "ESTADO DEL ITEM", value: data.item_condition || 'N/A' }
+    ];
+    y = drawInfoCards(doc, rowEmp, margin, y, pageWidth);
     y += 8;
 
     y = drawSectionTitle(doc, "DATOS DEL ELEMENTO", margin, y);
@@ -155,8 +164,8 @@ function generateDisposalPDF(data, returnBase64 = false) {
     y = drawSectionTitle(doc, "INFORMACIÓN DE LA BAJA", margin, y);
     const row1 = [
         { label: "MÉTODO", value: data.method || 'ELIMINACIÓN' },
-        { label: "ID PROCESO", value: data.dev_id || data.sku || 'N/A' },
-        { label: "FECHA", value: data.timestamp || 'N/A' }
+        { label: "FECHA Y HORA", value: data.timestamp || 'N/A' },
+        { label: "RESPONSABLE", value: data.responsible_name || data.current_user_email || 'N/A' }
     ];
     y = drawInfoCards(doc, row1, margin, y, pageWidth);
     y += 8;
@@ -175,8 +184,39 @@ function generateDisposalPDF(data, returnBase64 = false) {
     doc.text(splitNotes, margin, y);
     y += splitNotes.length * 5 + 15;
 
-    y = drawSignatures(doc, data, margin, y, pageWidth);
+    y = drawDisposalSignatures(doc, data, margin, y, pageWidth);
     return finalizePDF(doc, `Acta_Eliminacion_${data.sku}.pdf`, returnBase64);
+}
+
+function drawDisposalSignatures(doc, data, margin, y, pageWidth) {
+    const sigWidth = 60;
+    const sigHeight = 25;
+    const spacing = 20;
+    const startX = (pageWidth - (sigWidth * 2 + spacing)) / 2;
+
+    // Bloque Firma 1: Encargado de Eliminación (Firma digital capturada)
+    if (data.signature_resp_b64) {
+        addSignatureImage(doc, data.signature_resp_b64, startX, y, sigWidth, sigHeight);
+    }
+    doc.setDrawColor(...COLORS.text);
+    doc.setLineWidth(0.5);
+    doc.line(startX, y + sigHeight, startX + sigWidth, y + sigHeight);
+
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.text("ENCARGADO DE ELIMINACIÓN", startX + sigWidth / 2, y + sigHeight + 4, { align: 'center' });
+    doc.setFont('helvetica', 'normal');
+    doc.text(String(data.responsible_name || data.current_user_email || 'SST'), startX + sigWidth / 2, y + sigHeight + 8, { align: 'center' });
+
+    // Bloque Firma 2: Aprobado Por (Espacio para firma física)
+    const secondX = startX + sigWidth + spacing;
+    doc.line(secondX, y + sigHeight, secondX + sigWidth, y + sigHeight);
+    doc.setFont('helvetica', 'bold');
+    doc.text("APROBADO POR", secondX + sigWidth / 2, y + sigHeight + 4, { align: 'center' });
+    doc.setFont('helvetica', 'normal');
+    doc.text("Nombre y Firma", secondX + sigWidth / 2, y + sigHeight + 8, { align: 'center' });
+
+    return y + sigHeight + 15;
 }
 
 // --- COMPONENTES UI PDF ---
@@ -265,7 +305,13 @@ function drawSignatures(doc, data, margin, y, pageWidth) {
     doc.setFont('helvetica', 'bold');
     doc.text("FIRMA DEL EMPLEADO", startX + sigWidth / 2, y + sigHeight + 4, { align: 'center' });
     doc.setFont('helvetica', 'normal');
-    doc.text(String(data.employee_id || ''), startX + sigWidth / 2, y + sigHeight + 8, { align: 'center' });
+    if (data.employee_name) {
+        doc.text(String(data.employee_name).toUpperCase(), startX + sigWidth / 2, y + sigHeight + 8, { align: 'center' });
+        doc.setFontSize(7);
+        doc.text('ID/CC: ' + String(data.employee_id || ''), startX + sigWidth / 2, y + sigHeight + 11.5, { align: 'center' });
+    } else {
+        doc.text(String(data.employee_id || ''), startX + sigWidth / 2, y + sigHeight + 8, { align: 'center' });
+    }
 
     // Bloque Firma 2
     const secondX = startX + sigWidth + spacing;

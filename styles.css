@@ -1120,10 +1120,12 @@ th:last-child {
     }
 
     table {
-        min-width: 600px; /* Reducido para mejor scroll en móvil */
+        min-width: 600px;
+        /* Reducido para mejor scroll en móvil */
     }
 
-    th, td {
+    th,
+    td {
         padding: 10px 8px;
         font-size: 0.8rem;
     }
@@ -1201,4 +1203,51 @@ th:last-child {
 
 .dev-select-btn:hover {
     background: rgba(99, 102, 241, 0.3);
+}
+
+/* ===== EMPLOYEE PROFILE (DASHBOARD) ===== */
+.dashboard-grid {
+    display: grid;
+    gap: 20px;
+    width: 100%;
+}
+
+.stat-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    transition: var(--transition);
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    border-color: var(--accent);
+}
+
+.stat-title {
+    font-size: 0.9rem;
+    color: var(--text-light);
+    margin: 0 0 10px 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+.stat-value {
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: var(--accent);
+    line-height: 1;
+    margin-bottom: 5px;
+}
+
+.stat-trend {
+    font-size: 0.8rem;
+    font-weight: 500;
 }

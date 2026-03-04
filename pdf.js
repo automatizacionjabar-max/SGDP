@@ -80,11 +80,15 @@ function generateAssignmentPDF(data, returnBase64 = false) {
     y += 8;
 
     // --- BLOQUE 3: DETALLE DEL ARTÍCULO ---
-    y = drawSectionTitle(doc, "DETALLE DEL ELEMENTO ENTREGADO", margin, y);
-    const itemData = [
-        ["ARTÍCULO", "SKU / REFERENCIA", "CANTIDAD", "PRÓXIMO VENC."],
-        [data.item_name || 'N/A', data.sku || 'N/A', String(data.quantity || '0'), data.due_date || 'N/A']
-    ];
+    y = drawSectionTitle(doc, "DETALLE DE LOS ELEMENTOS ENTREGADOS", margin, y);
+    const itemData = [["ARTÍCULO", "SKU", "CANTIDAD", "TIPO/ORIGEN"]];
+    if (data.cart && data.cart.length > 0) {
+        data.cart.forEach(item => {
+            itemData.push([item.itemName, item.sku, String(item.quantity), `${item.deliveryType} (${item.origin})`]);
+        });
+    } else {
+        itemData.push([data.item_name || 'N/A', data.sku || 'N/A', String(data.quantity || '0'), data.delivery_type || 'Dotación']);
+    }
     y = drawTable(doc, itemData, margin, y, pageWidth);
 
     // --- LEGALES ---
@@ -133,11 +137,17 @@ function generateReturnPDF(data, returnBase64 = false) {
     y = drawInfoCards(doc, rowEmp, margin, y, pageWidth);
     y += 8;
 
-    y = drawSectionTitle(doc, "DATOS DEL ELEMENTO", margin, y);
-    const itemData = [
-        ["ARTÍCULO", "SKU", "CANTIDAD", "ID ASIG. ORIGINAL"],
-        [data.item_name || 'N/A', data.sku || 'N/A', String(data.quantity || '0'), data.asigOriginalId || 'N/A']
-    ];
+    y = drawSectionTitle(doc, "DETALLE DE LOS ELEMENTOS DEVUELTOS", margin, y);
+    const itemData = [["ARTÍCULO", "SKU", "CANTIDAD", "ESTADO"]];
+
+    if (data.cart && data.cart.length > 0) {
+        data.cart.forEach(item => {
+            itemData.push([item.itemName, item.sku, String(item.quantity), item.condition]);
+        });
+    } else {
+        itemData.push([data.item_name || 'N/A', data.sku || 'N/A', String(data.quantity || '0'), data.item_condition || 'N/A']);
+    }
+
     y = drawTable(doc, itemData, margin, y, pageWidth);
 
     y += 15;
@@ -170,11 +180,17 @@ function generateDisposalPDF(data, returnBase64 = false) {
     y = drawInfoCards(doc, row1, margin, y, pageWidth);
     y += 8;
 
-    y = drawSectionTitle(doc, "ARTÍCULO ELIMINADO", margin, y);
-    const itemData = [
-        ["ARTÍCULO", "SKU", "CANTIDAD", "UBICACIÓN"],
-        [data.item_name || 'N/A', data.sku || 'N/A', String(data.quantity || '0'), 'ALMACÉN BAJA']
-    ];
+    y = drawSectionTitle(doc, "ARTÍCULOS ELIMINADOS", margin, y);
+    const itemData = [["ARTÍCULO", "SKU", "CANTIDAD", "UBICACIÓN"]];
+
+    if (data.cart && data.cart.length > 0) {
+        data.cart.forEach(item => {
+            itemData.push([item.itemName, item.sku, String(item.quantity), 'ALMACÉN BAJA']);
+        });
+    } else {
+        itemData.push([data.item_name || 'N/A', data.sku || 'N/A', String(data.quantity || '0'), 'ALMACÉN BAJA']);
+    }
+
     y = drawTable(doc, itemData, margin, y, pageWidth);
 
     y += 15;

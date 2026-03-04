@@ -153,6 +153,11 @@ const App = {
         document.getElementById('form-empleado').addEventListener('submit', (e) => { e.preventDefault(); EmpleadosModule.save(); });
         document.getElementById('search-empleados').addEventListener('input', (e) => EmpleadosModule.filter(e.target.value));
 
+        // Perfil Empleado
+        document.getElementById('perfil-search-btn').addEventListener('click', () => EmployeeProfileModule.searchEmployee());
+        document.getElementById('perfil-search-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') EmployeeProfileModule.searchEmployee(); });
+        document.getElementById('perfil-clear-btn').addEventListener('click', () => EmployeeProfileModule.reset());
+
         // Inventario
         document.getElementById('btn-nuevo-articulo').addEventListener('click', () => InventarioModule.openNew());
         document.getElementById('form-inventario').addEventListener('submit', (e) => { e.preventDefault(); InventarioModule.save(); });
@@ -226,12 +231,13 @@ const App = {
         const target = document.getElementById(`page-${page}`);
         if (target) target.classList.remove('hidden');
 
-        const titles = { dashboard: 'Dashboard', empleados: 'Gestión de Personal', inventario: 'Inventario EPP', asignaciones: 'Asignación de EPP', devoluciones: 'Devolución de EPP' };
+        const titles = { dashboard: 'Dashboard', empleados: 'Gestión de Personal', perfil: 'Perfil del Empleado', inventario: 'Inventario EPP', asignaciones: 'Asignación de EPP', devoluciones: 'Devolución de EPP', disposicion: 'Disposición Final' };
         document.getElementById('page-title').textContent = titles[page] || page;
 
         switch (page) {
             case 'dashboard': DashboardModule.load(); break;
             case 'empleados': EmpleadosModule.load(); break;
+            case 'perfil': EmployeeProfileModule.load(); break;
             case 'inventario': InventarioModule.load(); break;
             case 'asignaciones': AssignmentsModule.load(); break;
             case 'devoluciones': ReturnsModule.load(); break;
@@ -1369,6 +1375,183 @@ App.navigateTo = function(page) {
     }
 };
 */
+
+// ===================================================================
+// EMPLOYEE PROFILE MODULE (NUEVO)
+// ===================================================================
+const EmployeeProfileModule = {
+    employeeData: null,
+    assignments: [],
+    returns: [],
+
+    load() {
+        document.getElementById('perfil-search-input').focus();
+    },
+
+    reset() {
+        this.employeeData = null;
+        this.assignments = [];
+        this.returns = [];
+        document.getElementById('perfil-search-input').value = '';
+        document.getElementById('perfil-search-input').disabled = false;
+        document.getElementById('perfil-search-btn').classList.remove('hidden');
+        document.getElementById('perfil-clear-btn').classList.add('hidden');
+        document.getElementById('perfil-content-wrapper').classList.add('hidden');
+    },
+
+    async searchEmployee() {
+        const query = document.getElementById('perfil-search-input').value.trim();
+        if (!query) return showToast('Ingrese una cédula para buscar.', 'warning');
+
+        showLoader('Cargando perfil del empleado...');
+
+        // 1. Fetch Employee Profile
+        const empRes = await api.request('getEmployee', { employeeId: query });
+        if (!empRes || !empRes.success) {
+            hideLoader();
+            return showToast('Empleado no encontrado.', 'error');
+        }
+
+        this.employeeData = empRes.data;
+
+        // 2 & 3. Parallell Fetch: All Asignments & All Returns for logic crossing
+        try {
+            const [asigRes, devRes] = await Promise.all([
+                api.request('getAllAsignaciones', {}, true),
+                api.request('getAllDevoluciones', {}, true)
+            ]);
+
+            this.assignments = (asigRes?.data || []).filter(a => String(a.ID_Empleado) === String(query));
+            this.returns = (devRes?.data || []).filter(d => String(d.employee_id) === String(query));
+
+            this.renderProfile();
+        } catch (error) {
+            console.error("Error fetching historical data:", error);
+            showToast('Error cargando el historial.', 'warning');
+        } finally {
+            hideLoader();
+        }
+    },
+
+    renderProfile() {
+        // Toggle UI states
+        document.getElementById('perfil-content-wrapper').classList.remove('hidden');
+        document.getElementById('perfil-search-input').disabled = true;
+        document.getElementById('perfil-search-btn').classList.add('hidden');
+        document.getElementById('perfil-clear-btn').classList.remove('hidden');
+
+        // Render Profile Header
+        const e = this.employeeData;
+        const nombreCompl = `${e['Nombres'] || ''} ${e['Apellidos'] || ''}`.trim() || 'Desconocido';
+        document.getElementById('perfil-nombre').textContent = nombreCompl;
+        document.getElementById('perfil-avatar').textContent = nombreCompl.charAt(0).toUpperCase();
+        document.getElementById('perfil-cedula').textContent = e['ID_Empleado'] || '-';
+        document.getElementById('perfil-cargo').textContent = e['Cargo'] || '-';
+        document.getElementById('perfil-sede').textContent = e['SedePorcicola'] || '-';
+        document.getElementById('perfil-area').textContent = e['Area'] || '-';
+        document.getElementById('perfil-estado').textContent = e['Estado'] || 'Activo';
+
+        // Procesar Cruce de Datos (KPIs y Active vs Historical)
+        this.calculateAndRenderKardex();
+    },
+
+    calculateAndRenderKardex() {
+        let activosCounter = 0;
+        let vencidosCounter = 0;
+        const devueltosCounter = this.returns.length;
+
+        // Estructuras para Tablas
+        let tbodyActivos = '';
+        let tbodyHistorial = '';
+
+        // Fechas Helper
+        const hoy = new Date();
+        hoy.setHours(0, 0, 0, 0);
+
+        // Map para agrupar devoluciones por 'asigOriginalId'
+        const devMap = {};
+        this.returns.forEach(d => {
+            const asid = d.asigOriginalId || d.dev_id; // Fallback
+            if (!devMap[asid]) devMap[asid] = 0;
+            devMap[asid] += parseInt(d.quantity) || 0;
+
+            // Render Devolucion en Historial Inmediatamente
+            const condBadge = d.item_condition === 'Bueno' ? 'badge-success' : d.item_condition === 'Regular' ? 'badge-warning' : 'badge-danger';
+            tbodyHistorial += `<tr>
+                <td>${d.timestamp.split(' ')[0]}</td>
+                <td><span class="badge badge-warning">DEVOLUCIÓN</span></td>
+                <td><small>${d.dev_id}</small></td>
+                <td>${d.sku}</td>
+                <td>${d.quantity}</td>
+                <td><span class="badge ${condBadge}">${d.item_condition}</span></td>
+            </tr>`;
+        });
+
+        // Loop sobre Asignaciones
+        this.assignments.forEach(a => {
+            const id = a.ID_Asignacion;
+            const cantOtorgada = parseInt(a.Cantidad) || 0;
+            const cantDevuelta = devMap[id] || 0;
+            const saldoActivo = cantOtorgada - cantDevuelta;
+
+            // Render Asignacion en Historial Inmediatamente
+            tbodyHistorial += `<tr>
+                <td>${a.Timestamp.split(' ')[0]}</td>
+                <td><span class="badge badge-primary">ASIGNACIÓN</span></td>
+                <td><small>${a.ID_Asignacion}</small></td>
+                <td>${a.SKU}</td>
+                <td>${a.Cantidad}</td>
+                <td>${a.TipoEntrega || 'Dotación'}</td>
+            </tr>`;
+
+            if (saldoActivo > 0) {
+                activosCounter += saldoActivo;
+
+                // Chequear Vencimiento
+                let badgeVenc = '<span class="badge badge-success">Vigente</span>';
+                if (a.ProximoVencimiento) {
+                    const fVenc = new Date(a.ProximoVencimiento + 'T00:00:00'); // Forza local
+                    if (fVenc < hoy) {
+                        vencidosCounter++;
+                        badgeVenc = `<span class="badge badge-danger">Vencido</span>`;
+                    } else {
+                        badgeVenc = a.ProximoVencimiento;
+                    }
+                } else {
+                    badgeVenc = 'No Aplica';
+                }
+
+                tbodyActivos += `<tr>
+                    <td>${a.Timestamp.split(' ')[0]}</td>
+                    <td>${a.SKU}</td>
+                    <td>${a.ItemNombre}</td>
+                    <td><strong>${saldoActivo}</strong> (de ${cantOtorgada})</td>
+                    <td>${badgeVenc}</td>
+                </tr>`;
+            }
+        });
+
+        // Check vacios
+        if (tbodyActivos === '') tbodyActivos = '<tr><td colspan="5" class="text-center">No tiene elementos activos en su poder.</td></tr>';
+        if (tbodyHistorial === '') tbodyHistorial = '<tr><td colspan="6" class="text-center">El empleado no tiene movimientos registrados.</td></tr>';
+
+        // Pintar Stats
+        document.getElementById('perfil-stat-activos').textContent = activosCounter;
+        document.getElementById('perfil-stat-devueltos').textContent = devueltosCounter;
+        document.getElementById('perfil-stat-vencidos').textContent = vencidosCounter;
+
+        // Pintar Tablas
+        document.getElementById('perfil-activos-body').innerHTML = tbodyActivos;
+
+        // *Truco: Historial Inverso
+        const rowArray = tbodyHistorial.replace(/<\/tr>/g, '</tr>|').split('|').filter(r => r.trim() !== '');
+        if (this.assignments.length > 0 || this.returns.length > 0) {
+            document.getElementById('perfil-historial-body').innerHTML = rowArray.reverse().join('');
+        } else {
+            document.getElementById('perfil-historial-body').innerHTML = tbodyHistorial;
+        }
+    }
+};
 
 // ===================================================================
 // INIT

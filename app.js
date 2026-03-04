@@ -536,11 +536,11 @@ const InventarioModule = {
         document.getElementById('inv-sku').disabled = true;
         document.getElementById('inv-nombre').value = item['ItemNombre'] || item['Nombre'] || '';
         document.getElementById('inv-descripcion').value = item['Descripcion'] || '';
-        document.getElementById('inv-stock').value = item['StockActual'] || 0;
+        document.getElementById('inv-stock').value = item['StockActual'] || 0; // Stock Nuevo
+        document.getElementById('inv-stock-usado').value = item['StockMant'] || 0; // Stock Usado
         document.getElementById('inv-minimo').value = item['StockMinimo'] || 0;
         document.getElementById('inv-vencimiento').value = item['Vencimiento'] || '';
         document.getElementById('inv-costo').value = item['CostoUnitario'] || item['Costo'] || '';
-        document.getElementById('inv-stockmant').value = item['StockMant'] || 0;
         document.getElementById('inv-stockbaja').value = item['StockBaja'] || 0;
         document.getElementById('inv-ubicacion').value = item['Ubicacion'] || '';
         await this.loadOptions();
@@ -569,7 +569,7 @@ const InventarioModule = {
             document.getElementById('inv-vencimiento').value,
             document.getElementById('inv-proveedor').value,
             parseFloat(document.getElementById('inv-costo').value) || 0,
-            parseInt(document.getElementById('inv-stockmant').value) || 0,
+            parseInt(document.getElementById('inv-stock-usado').value) || 0, // StockMant ahora es StockUsado
             parseInt(document.getElementById('inv-stockbaja').value) || 0,
             document.getElementById('inv-ubicacion').value.trim()
         ];
@@ -598,6 +598,7 @@ const AssignmentsModule = {
     sigEmp: null,
     sigResp: null,
     historyData: [],
+    cart: [], // Arreglo para almacenar elementos del carrito
 
     async load() {
         // Load history table
@@ -618,8 +619,10 @@ const AssignmentsModule = {
         this.currentStep = 1;
         this.employeeData = null;
         this.lastAssignmentData = null;
+        this.cart = []; // Limpiar carrito
 
         document.getElementById('asig-emp-id').value = '';
+        this.renderCart(); // Limpiar tabla DOM
         document.getElementById('asig-emp-info').classList.add('hidden');
         document.getElementById('asig-step-2').classList.add('hidden');
         document.getElementById('asig-step-3').classList.add('hidden');
@@ -745,6 +748,73 @@ const AssignmentsModule = {
                 sel.appendChild(opt);
             });
         }
+        // Configurar botón añadir al carrito
+        const addBtn = document.getElementById('asig-add-cart-btn');
+        const oldBtn = addBtn.cloneNode(true); // Remove old listeners
+        addBtn.parentNode.replaceChild(oldBtn, addBtn);
+        oldBtn.addEventListener('click', () => this.addCartItem());
+
+    },
+
+    addCartItem() {
+        const itemSel = document.getElementById('asig-item');
+        const sku = itemSel.value;
+        const nombreItem = itemSel.options[itemSel.selectedIndex]?.dataset.name || '';
+        const qty = parseInt(document.getElementById('asig-quantity').value) || 1;
+        const type = document.getElementById('asig-delivery-type').value;
+        const origin = document.getElementById('asig-stock-origin').value;
+
+        if (!sku) return showToast('Seleccione un artículo', 'warning');
+
+        // Validar Stock
+        const invItem = this.inventoryItems.find(i => String(i.SKU) === String(sku));
+        if (!invItem) return showToast('Artículo no encontrado en inventario', 'error');
+
+        const available = origin === 'nuevo'
+            ? parseInt(invItem.StockActual) || 0
+            : parseInt(invItem.StockMant) || 0; // StockMant represents Usado
+
+        // Considerar lo que ya está en el carrito
+        const inCartQty = this.cart
+            .filter(c => c.sku === sku && c.origin === origin)
+            .reduce((sum, c) => sum + parseInt(c.quantity), 0);
+
+        if (available < (qty + inCartQty)) {
+            return showToast(`Stock insuficiente en '${origin}'. Disponible: ${available - inCartQty}`, 'error');
+        }
+
+        this.cart.push({ sku, itemName: nombreItem, quantity: qty, deliveryType: type, origin });
+        this.renderCart();
+
+        // Reset inputs
+        itemSel.value = '';
+        document.getElementById('asig-quantity').value = 1;
+    },
+
+    removeCartItem(index) {
+        this.cart.splice(index, 1);
+        this.renderCart();
+    },
+
+    renderCart() {
+        const tbody = document.getElementById('asig-cart-body');
+        if (this.cart.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center">Carrito vacío</td></tr>';
+            return;
+        }
+
+        let html = '';
+        this.cart.forEach((item, index) => {
+            html += `<tr>
+                <td>${item.sku}</td>
+                <td>${item.itemName}</td>
+                <td>${item.deliveryType}</td>
+                <td><span class="badge ${item.origin === 'nuevo' ? 'badge-success' : 'badge-warning'}">${item.origin.toUpperCase()}</span></td>
+                <td>${item.quantity}</td>
+                <td><button type="button" class="btn btn-danger btn-xs" onclick="AssignmentsModule.removeCartItem(${index})">X</button></td>
+            </tr>`;
+        });
+        tbody.innerHTML = html;
     },
 
     nextStep() {
@@ -754,7 +824,7 @@ const AssignmentsModule = {
             document.getElementById('asig-prev-btn').classList.remove('hidden');
             document.getElementById('asig-next-btn').textContent = 'Siguiente → Firmas';
         } else if (this.currentStep === 2) {
-            if (!document.getElementById('asig-item').value) { showToast('Seleccione un artículo.', 'warning'); return; }
+            if (this.cart.length === 0) { return showToast('Agregue al menos un elemento al carrito.', 'warning'); }
             this.currentStep = 3;
             document.getElementById('asig-step-3').classList.remove('hidden');
             document.getElementById('asig-next-btn').classList.add('hidden');
@@ -784,53 +854,71 @@ const AssignmentsModule = {
     },
 
     async save() {
-        const sel = document.getElementById('asig-item');
-        const itemName = sel.options[sel.selectedIndex]?.dataset?.name || '';
+        if (this.cart.length === 0) {
+            return showToast('El carrito está vacío.', 'warning');
+        }
 
-        const payload = {
-            employeeId: this.employeeData['ID_Empleado'] || document.getElementById('asig-emp-id').value,
-            sku: sel.value,
-            quantity: parseInt(document.getElementById('asig-quantity').value) || 1,
-            deliveryType: document.getElementById('asig-delivery-type').value,
-            nextDueDate: document.getElementById('asig-due-date').value,
-            notes: document.getElementById('asig-notes').value,
-            itemName: itemName,
-            signatureEmpB64: this.sigEmp ? this.sigEmp.toBase64Raw() : '',
-            signatureRespB64: this.sigResp ? this.sigResp.toBase64Raw() : ''
-        };
+        const employeeId = this.employeeData ? this.employeeData['ID_Empleado'] : document.getElementById('asig-emp-id').value;
+        const notes = document.getElementById('asig-notes').value;
+        const dueDate = document.getElementById('asig-due-date').value;
+        const sigEmpB64 = this.sigEmp ? this.sigEmp.toBase64Raw() : '';
+        const sigRespB64 = this.sigResp ? this.sigResp.toBase64Raw() : '';
 
-        showLoader('Registrando asignación...');
-        const result = await api.request('saveAssignment', payload);
+        showLoader('Registrando asignaciones...');
+        let successCount = 0;
+        let firstAsigId = null;
+        let lastResult = null;
+
+        for (const item of this.cart) {
+            const payload = {
+                employeeId: employeeId,
+                sku: item.sku,
+                quantity: item.quantity,
+                deliveryType: item.deliveryType,
+                nextDueDate: dueDate,
+                notes: notes + (item.origin === 'usado' ? ' [STOCK USADO]' : ''),
+                itemName: item.itemName,
+                signatureEmpB64: sigEmpB64,
+                signatureRespB64: sigRespB64
+            };
+
+            const result = await api.request('saveAssignment', payload);
+            if (result && result.success) {
+                successCount++;
+                lastResult = result;
+                if (!firstAsigId) firstAsigId = result.data.asig_id;
+            } else {
+                showToast(`Error guardando ${item.itemName}: ${result?.message}`, 'error');
+            }
+        }
         hideLoader();
 
-        if (result && result.success) {
-            this.lastAssignmentData = result.data;
+        if (successCount > 0) {
+            this.lastAssignmentData = lastResult.data || {};
+            this.lastAssignmentData.asig_id = firstAsigId + (successCount > 1 ? ` (+${successCount - 1})` : '');
+            this.lastAssignmentData.cart = this.cart;
+
             this.lastAssignmentData.signature_emp_b64 = this.sigEmp ? this.sigEmp.toBase64() : '';
             this.lastAssignmentData.signature_resp_b64 = this.sigResp ? this.sigResp.toBase64() : '';
 
-            document.getElementById('asig-result-msg').textContent = result.message;
+            document.getElementById('asig-result-msg').textContent = `Se registraron ${successCount} artículos correctamente.`;
             document.getElementById('asig-result').classList.remove('hidden');
             document.querySelectorAll('.asig-step, .asig-actions').forEach(el => el.classList.add('hidden'));
 
-            showToast(result.message);
+            showToast(`Asignación completada (${successCount} items)`);
             api.invalidateCache();
-            this.loadHistory(); // Refresh history
+            this.loadHistory();
 
-            // --- RESPALDO EN DRIVE (Opcional) ---
             const pdfBase64 = generateAssignmentPDF(this.lastAssignmentData, true);
             if (pdfBase64) {
                 api.request('savePdfToDrive', {
                     pdfBase64: pdfBase64,
-                    filename: `Recibo_${this.lastAssignmentData.asig_id}.pdf`,
+                    filename: `Recibo_${firstAsigId}_Multiple.pdf`,
                     folderId: DRIVE_FOLDER_ID
                 }).then(driveRes => {
-                    if (driveRes && driveRes.success) {
-                        console.log('Respaldo en Drive exitoso:', driveRes.fileUrl);
-                    }
+                    if (driveRes && driveRes.success) console.log('Respaldo en Drive exitoso:', driveRes.fileUrl);
                 });
             }
-        } else {
-            showToast(result?.message || 'Error al guardar.', 'error');
         }
     },
 
@@ -946,97 +1034,158 @@ const ReturnsModule = {
 
         if (!result || !result.success) { showToast(result?.message || 'Error.', 'error'); return; }
 
-        const c = document.getElementById('dev-assignments-list');
+        const c = document.getElementById('dev-active-body');
         if (result.data.length === 0) {
-            c.innerHTML = '<p class="loading-text">No hay asignaciones para este empleado.</p>';
+            c.innerHTML = '<tr><td colspan="5" class="text-center">No hay asignaciones activas para este empleado.</td></tr>';
+            document.getElementById('dev-continue-btn').classList.add('hidden');
         } else {
-            let h = '<table><thead><tr><th>ID</th><th>Fecha</th><th>SKU</th><th>Artículo</th><th>Cant</th><th>Acción</th></tr></thead><tbody>';
-            result.data.forEach(a => {
-                h += `<tr><td>${a.ID_Asignacion}</td><td>${a.Timestamp}</td><td>${a.SKU}</td><td>${a.ItemNombre}</td><td>${a.Cantidad}</td><td><button class="dev-select-btn" onclick="ReturnsModule.selectAssignment('${a.ID_Asignacion}','${a.SKU}')">Seleccionar</button></td></tr>`;
+            let h = '';
+            // Guardar data localmente para referencia
+            this.activeAssignments = result.data;
+
+            result.data.forEach((a, idx) => {
+                h += `<tr>
+                    <td class="text-center">
+                        <input type="checkbox" class="dev-item-check" data-idx="${idx}" onchange="ReturnsModule.toggleRow(${idx})">
+                    </td>
+                    <td>${a.ID_Asignacion}</td>
+                    <td>${a.SKU} - ${a.ItemNombre} (Asig: ${a.Cantidad})</td>
+                    <td>
+                        <input type="number" id="dev-qty-${idx}" class="dev-qty-input" min="1" max="${a.Cantidad}" value="1" disabled style="width: 60px;">
+                    </td>
+                    <td>
+                        <select id="dev-cond-${idx}" disabled>
+                            <option value="Bueno">Bueno (A Stock Usado)</option>
+                            <option value="Dañado">Dañado (A Stock Baja)</option>
+                            <option value="Regular">Regular (A Stock Usado)</option>
+                        </select>
+                    </td>
+                </tr>`;
             });
-            h += '</tbody></table>';
             c.innerHTML = h;
+            document.getElementById('dev-continue-btn').classList.remove('hidden');
         }
         document.getElementById('dev-assignments').classList.remove('hidden');
     },
 
-    selectAssignment(asigId, sku) {
-        document.getElementById('dev-asig-id').value = asigId;
-        document.getElementById('dev-sku').value = sku;
-        document.getElementById('dev-quantity').value = 1;
-        document.getElementById('dev-condition').value = 'Bueno';
-        document.getElementById('dev-notes').value = '';
+    toggleRow(idx) {
+        const isChecked = document.querySelector(`.dev-item-check[data-idx="${idx}"]`).checked;
+        document.getElementById(`dev-qty-${idx}`).disabled = !isChecked;
+        document.getElementById(`dev-cond-${idx}`).disabled = !isChecked;
+    },
+
+    prepareReturn() {
+        const checkboxes = document.querySelectorAll('.dev-item-check:checked');
+        if (checkboxes.length === 0) {
+            return showToast('Debe seleccionar al menos un artículo para devolver.', 'warning');
+        }
+
         document.getElementById('dev-form-container').classList.remove('hidden');
 
-        // Initialize signature pads
+        // Inicializar firmas
         setTimeout(() => {
             const canvasEmp = document.getElementById('sig-dev-emp');
             const canvasResp = document.getElementById('sig-dev-resp');
             const options = { penColor: "rgb(26, 35, 126)", minWidth: 0.5, maxWidth: 3.0 };
 
-            this.sigEmp = canvasEmp ? new SignaturePad('sig-dev-emp') : null;
-            this.sigResp = canvasResp ? new SignaturePad('sig-dev-resp') : null;
+            this.sigEmp = canvasEmp ? new SignaturePad('sig-dev-emp', options) : null;
+            this.sigResp = canvasResp ? new SignaturePad('sig-dev-resp', options) : null;
 
             if (this.sigEmp) document.getElementById('clear-sig-dev-emp').onclick = () => this.sigEmp.clear();
             if (this.sigResp) document.getElementById('clear-sig-dev-resp').onclick = () => this.sigResp.clear();
         }, 200);
     },
 
-    async processReturn() {
-        const payload = {
-            asigOriginalId: document.getElementById('dev-asig-id').value,
-            employeeId: this.employeeId,
-            sku: document.getElementById('dev-sku').value,
-            quantityReturned: parseInt(document.getElementById('dev-quantity').value) || 1,
-            itemCondition: document.getElementById('dev-condition').value,
-            notes: document.getElementById('dev-notes').value,
-            signatureEmpB64: this.sigEmp && !this.sigEmp.isEmpty() ? this.sigEmp.toBase64Raw() : '',
-            signatureRespB64: this.sigResp && !this.sigResp.isEmpty() ? this.sigResp.toBase64Raw() : ''
-        };
+    // Reemplazada por prepareReturn
 
-        showLoader('Procesando devolución...');
-        const result = await api.request('processReturn', payload);
+
+    async processReturn() {
+        const checkboxes = document.querySelectorAll('.dev-item-check:checked');
+        if (checkboxes.length === 0) return showToast('No hay ítems seleccionados.', 'warning');
+
+        if ((!this.sigEmp || this.sigEmp.isEmpty()) || (!this.sigResp || this.sigResp.isEmpty())) {
+            return showToast('Ambas firmas son obligatorias.', 'warning');
+        }
+
+        const sigEmpB64 = this.sigEmp.toBase64Raw();
+        const sigRespB64 = this.sigResp.toBase64Raw();
+        const globalNotes = document.getElementById('dev-notes').value;
+
+        showLoader('Procesando devoluciones...');
+
+        let successCount = 0;
+        let firstDevId = null;
+        let returnedItems = [];
+        let commonData = null;
+
+        for (const cb of checkboxes) {
+            const idx = cb.dataset.idx;
+            const item = this.activeAssignments[idx];
+            const qty = parseInt(document.getElementById(`dev-qty-${idx}`).value) || 1;
+            const cond = document.getElementById(`dev-cond-${idx}`).value;
+
+            const payload = {
+                asigOriginalId: item.ID_Asignacion,
+                employeeId: this.employeeId,
+                sku: item.SKU,
+                quantityReturned: qty,
+                itemCondition: cond,
+                notes: globalNotes,
+                signatureEmpB64: sigEmpB64,
+                signatureRespB64: sigRespB64
+            };
+
+            const result = await api.request('processReturn', payload);
+            if (result && result.success) {
+                successCount++;
+                if (!firstDevId) firstDevId = result.dev_id || result.data?.dev_id || 'DEV-MULTIPLE';
+                if (!commonData) commonData = result; // Guardar data de la primera resp para el PDF
+
+                returnedItems.push({
+                    sku: item.SKU,
+                    itemName: item.ItemNombre,
+                    quantity: qty,
+                    condition: cond
+                });
+            } else {
+                showToast(`Error devolviendo ${item.SKU}: ${result?.message}`, 'error');
+            }
+        }
         hideLoader();
 
-        if (result && result.success) {
-            // El servidor ya devuelve employee_name, company, item_name, etc.
-            const row = result;
-            row.signature_emp_b64 = this.sigEmp ? this.sigEmp.toBase64() : '';
-            row.signature_resp_b64 = this.sigResp ? this.sigResp.toBase64() : '';
+        if (successCount > 0) {
+            // Construir objeto para PDF Múltiple
+            const pdfData = {
+                ...commonData,
+                dev_id: firstDevId + (successCount > 1 ? ` (+${successCount - 1})` : ''),
+                cart: returnedItems, // Usamos la misma lógica de "cart" en pdf.js
+                signature_emp_b64: this.sigEmp.toBase64(),
+                signature_resp_b64: this.sigResp.toBase64(),
+                responsible_name: api.getUser()?.Nombre || 'Responsable SST'
+            };
 
-            // Generar PDF correspondiente con datos completos
-            const user = api.getUser();
-            row.responsible_name = user.Nombre || user.Email || 'Responsable SST';
+            // Generar PDF (Podría ser mezclado, usamos plantilla de devolución por defecto, 
+            // aunque si todos son dañados podría ser un acta de baja masiva. Para simplificar, usamos ReturnPDF).
+            const pdfBase64 = generateReturnPDF(pdfData, true);
+            generateReturnPDF(pdfData); // Descargar
 
-            let pdfBase64 = null;
-            if (row.item_condition === 'Bueno') {
-                pdfBase64 = generateReturnPDF(row, true);
-                generateReturnPDF(row);
-            } else {
-                pdfBase64 = generateDisposalPDF(row, true);
-                generateDisposalPDF(row);
-            }
-
-            // Respaldo en Drive
             if (pdfBase64) {
                 api.request('savePdfToDrive', {
                     pdfBase64: pdfBase64,
-                    filename: `${row.item_condition === 'Bueno' ? 'Devolucion' : 'Acta_Eliminacion'}_${row.dev_id}.pdf`,
+                    filename: `Devolucion_${firstDevId}_Multiple.pdf`,
                     folderId: DRIVE_FOLDER_ID
                 });
             }
 
-            document.getElementById('dev-result-msg').textContent = result.message;
+            document.getElementById('dev-result-msg').textContent = `Se procesaron ${successCount} artículos correctamente.`;
             document.getElementById('dev-result').classList.remove('hidden');
             document.getElementById('dev-form-container').classList.add('hidden');
             document.getElementById('dev-assignments').classList.add('hidden');
 
-            showToast(result.message);
-            this.reset();
+            showToast(`Devolución completada (${successCount} items)`);
+            this.resetForm();
             this.loadHistory();
             api.invalidateCache();
-        } else {
-            showToast(result?.message || 'Error.', 'error');
         }
     },
 

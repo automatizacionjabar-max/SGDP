@@ -881,8 +881,8 @@ const ReturnsModule = {
             const sigOptions = { penColor: "rgb(0, 0, 0)", minWidth: 0.5, maxWidth: 2.5 };
             const canvasEmp = document.getElementById('sig-dev-emp');
             const canvasResp = document.getElementById('sig-dev-resp');
-            if (canvasEmp) this.sigEmp = new SignaturePad(canvasEmp, sigOptions);
-            if (canvasResp) this.sigResp = new SignaturePad(canvasResp, sigOptions);
+            if (canvasEmp) this.sigEmp = new SignaturePad('sig-dev-emp');
+            if (canvasResp) this.sigResp = new SignaturePad('sig-dev-resp');
             const btnClearEmp = document.getElementById('clear-sig-dev-emp');
             const btnClearResp = document.getElementById('clear-sig-dev-resp');
             if (btnClearEmp) btnClearEmp.onclick = () => this.sigEmp?.clear();
@@ -974,8 +974,8 @@ const ReturnsModule = {
             const canvasResp = document.getElementById('sig-dev-resp');
             const options = { penColor: "rgb(26, 35, 126)", minWidth: 0.5, maxWidth: 3.0 };
 
-            this.sigEmp = canvasEmp ? new SignaturePad(canvasEmp, options) : null;
-            this.sigResp = canvasResp ? new SignaturePad(canvasResp, options) : null;
+            this.sigEmp = canvasEmp ? new SignaturePad('sig-dev-emp') : null;
+            this.sigResp = canvasResp ? new SignaturePad('sig-dev-resp') : null;
 
             if (this.sigEmp) document.getElementById('clear-sig-dev-emp').onclick = () => this.sigEmp.clear();
             if (this.sigResp) document.getElementById('clear-sig-dev-resp').onclick = () => this.sigResp.clear();
@@ -1128,7 +1128,7 @@ const DisposalModule = {
     },
 
     openDisposal(sku) {
-        const item = this.data.find(i => i.sku === sku);
+        const item = this.data.find(i => String(i.sku) === String(sku));
         if (!item) return;
 
         document.getElementById('disp-sku').value = item.sku;
@@ -1142,8 +1142,7 @@ const DisposalModule = {
         // Initialize signature pad
         setTimeout(() => {
             const canvas = document.getElementById('sig-disp-resp');
-            const sigOptions = { penColor: "rgb(26, 35, 126)", minWidth: 0.5, maxWidth: 3.0 };
-            this.sigResp = new SignaturePad(canvas, sigOptions);
+            if (canvas) this.sigResp = new SignaturePad('sig-disp-resp');
             document.getElementById('clear-sig-disp-resp').onclick = () => this.sigResp?.clear();
         }, 200);
     },

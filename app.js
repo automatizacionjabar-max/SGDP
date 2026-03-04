@@ -19,7 +19,7 @@ class ApiClient {
         this.baseUrl = baseUrl;
         this._cache = {};
         this._cacheExpiry = {};
-        this.CACHE_TTL = 60000; // 60 seconds cache
+        this.CACHE_TTL = 10000; // 10 seconds cache (reducido para mejor experiencia durante pruebas)
     }
 
     getToken() { return localStorage.getItem('sgdp_token') || ''; }
@@ -152,6 +152,8 @@ const App = {
         document.getElementById('btn-nuevo-empleado').addEventListener('click', () => EmpleadosModule.openNew());
         document.getElementById('form-empleado').addEventListener('submit', (e) => { e.preventDefault(); EmpleadosModule.save(); });
         document.getElementById('search-empleados').addEventListener('input', (e) => EmpleadosModule.filter(e.target.value));
+        document.getElementById('emp-prev-page').addEventListener('click', () => EmpleadosModule.prevPage());
+        document.getElementById('emp-next-page').addEventListener('click', () => EmpleadosModule.nextPage());
 
         // Perfil Empleado
         document.getElementById('perfil-search-btn').addEventListener('click', () => EmployeeProfileModule.searchEmployee());
@@ -323,7 +325,7 @@ const EmpleadosModule = {
     data: [],
     filteredData: [],
     currentPage: 1,
-    pageSize: 50,
+    pageSize: 500,
     optionsCache: null,
     searchTimeout: null,
 
@@ -451,10 +453,23 @@ const EmpleadosModule = {
         const r = await api.request('getEmpleadosOptions', {}, true);
         if (r && r.success) {
             this.optionsCache = r.data;
-            populateSelect('emp-cargo', r.data.cargos);
-            populateSelect('emp-area', r.data.areas);
-            populateSelect('emp-sede', r.data.sedes);
-            populateSelect('emp-empresa', r.data.empresas);
+            populateSelect('emp-cargo', r.data.cargos || []);
+            populateSelect('emp-area', r.data.areas || []);
+            populateSelect('emp-sede', r.data.sedes || []);
+            // Empresa: puede venir en r.data.empresas o leerse de la hoja Listas columna G
+            const empresas = r.data.empresas || r.data.empresa || [];
+            if (empresas.length > 0) {
+                populateSelect('emp-empresa', empresas);
+            } else {
+                // Fallback: intentar leer directamente la lista de empresas
+                const fallback = await api.request('getLista', { hoja: 'Listas', columna: 'G', encabezado: 'Empresa' }, true);
+                if (fallback && fallback.success) {
+                    populateSelect('emp-empresa', fallback.data || []);
+                } else {
+                    // Fallback manual mientras el backend se actualiza
+                    populateSelect('emp-empresa', ['Empresa Principal', 'Contratista', 'Temporal']);
+                }
+            }
             return r.data;
         }
         return null;

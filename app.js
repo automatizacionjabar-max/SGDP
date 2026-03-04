@@ -181,7 +181,7 @@ const App = {
 
         // Disposición Final
         document.getElementById('form-disposicion').addEventListener('submit', (e) => { e.preventDefault(); DisposalModule.save(); });
-        document.getElementById('clear-sig-disp').addEventListener('click', () => DisposalModule.sigResp?.clear());
+        document.getElementById('clear-sig-disp-resp').addEventListener('click', () => DisposalModule.sigResp?.clear());
 
         // Connectivity
         window.addEventListener('online', () => document.getElementById('offline-banner').classList.add('hidden'));
@@ -879,12 +879,14 @@ const ReturnsModule = {
 
         setTimeout(() => {
             const sigOptions = { penColor: "rgb(0, 0, 0)", minWidth: 0.5, maxWidth: 2.5 };
-            const canvasEmp = document.getElementById('dev-sig-empleado');
-            const canvasResp = document.getElementById('dev-sig-responsable');
+            const canvasEmp = document.getElementById('sig-dev-emp');
+            const canvasResp = document.getElementById('sig-dev-resp');
             if (canvasEmp) this.sigEmp = new SignaturePad(canvasEmp, sigOptions);
             if (canvasResp) this.sigResp = new SignaturePad(canvasResp, sigOptions);
-            document.getElementById('dev-clear-sig-emp').onclick = () => this.sigEmp?.clear();
-            document.getElementById('dev-clear-sig-resp').onclick = () => this.sigResp?.clear();
+            const btnClearEmp = document.getElementById('clear-sig-dev-emp');
+            const btnClearResp = document.getElementById('clear-sig-dev-resp');
+            if (btnClearEmp) btnClearEmp.onclick = () => this.sigEmp?.clear();
+            if (btnClearResp) btnClearResp.onclick = () => this.sigResp?.clear();
         }, 100);
     },
 

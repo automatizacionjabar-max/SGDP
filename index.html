@@ -430,6 +430,17 @@
                         <!-- Step 3: Firmas -->
                         <div id="asig-step-3" class="asig-step hidden">
                             <h4>Paso 3: Firmas Digitales</h4>
+                            <div class="form-grid" style="margin-bottom: 16px;">
+                                <div class="input-group">
+                                    <label for="asig-due-date">Próximo Vencimiento (Opcional)</label>
+                                    <input type="date" id="asig-due-date">
+                                </div>
+                                <div class="input-group full-width">
+                                    <label for="asig-notes">Notas / Observaciones</label>
+                                    <textarea id="asig-notes" rows="2"
+                                        placeholder="Observaciones generales de la entrega..."></textarea>
+                                </div>
+                            </div>
                             <div class="signatures-grid">
                                 <div class="signature-box"><label>Firma del Empleado</label><canvas id="sig-empleado"
                                         class="signature-canvas" width="350" height="150"></canvas><button type="button"

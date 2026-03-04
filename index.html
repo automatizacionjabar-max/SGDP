@@ -290,8 +290,12 @@
                                     </select>
                                 </div>
                                 <div class="input-group">
-                                    <label for="inv-stock">Stock Actual</label>
+                                    <label for="inv-stock">Stock Nuevo</label>
                                     <input type="number" id="inv-stock" min="0" required>
+                                </div>
+                                <div class="input-group">
+                                    <label for="inv-stock-usado">Stock Usado</label>
+                                    <input type="number" id="inv-stock-usado" min="0" value="0">
                                 </div>
                                 <div class="input-group">
                                     <label for="inv-minimo">Stock Mínimo</label>
@@ -316,10 +320,6 @@
                                 <div class="input-group">
                                     <label for="inv-costo">Costo Unitario</label>
                                     <input type="number" id="inv-costo" step="0.01" min="0">
-                                </div>
-                                <div class="input-group">
-                                    <label for="inv-stockmant">Stock Mant.</label>
-                                    <input type="number" id="inv-stockmant" min="0" value="0">
                                 </div>
                                 <div class="input-group">
                                     <label for="inv-stockbaja">Stock Baja</label>
@@ -365,25 +365,64 @@
                                 <p><strong>Área:</strong> <span id="asig-emp-area">-</span></p>
                             </div>
                         </div>
-                        <!-- Step 2: Seleccionar EPP -->
+                        <!-- Step 2: Seleccionar EPP (Carrito) -->
                         <div id="asig-step-2" class="asig-step hidden">
-                            <h4>Paso 2: Seleccionar EPP</h4>
+                            <h4>Paso 2: Añadir al Carrito</h4>
                             <div class="form-grid">
-                                <div class="input-group"><label for="asig-item">Artículo</label><select id="asig-item">
+                                <div class="input-group">
+                                    <label for="asig-item">Artículo</label>
+                                    <select id="asig-item">
                                         <option value="">Seleccione...</option>
-                                    </select></div>
-                                <div class="input-group"><label for="asig-quantity">Cantidad</label><input type="number"
-                                        id="asig-quantity" min="1" value="1"></div>
-                                <div class="input-group"><label for="asig-delivery-type">Tipo Entrega</label><select
-                                        id="asig-delivery-type">
+                                    </select>
+                                </div>
+                                <div class="input-group">
+                                    <label for="asig-stock-origin">Extraer de</label>
+                                    <select id="asig-stock-origin">
+                                        <option value="nuevo">Stock Nuevo</option>
+                                        <option value="usado">Stock Usado</option>
+                                    </select>
+                                </div>
+                                <div class="input-group">
+                                    <label for="asig-quantity">Cantidad</label>
+                                    <input type="number" id="asig-quantity" min="1" value="1">
+                                </div>
+                                <div class="input-group">
+                                    <label for="asig-delivery-type">Tipo Entrega</label>
+                                    <select id="asig-delivery-type">
                                         <option value="Dotación">Dotación</option>
                                         <option value="Reposición">Reposición</option>
                                         <option value="Emergencia">Emergencia</option>
-                                    </select></div>
-                                <div class="input-group"><label for="asig-due-date">Próximo Vencimiento</label><input
-                                        type="date" id="asig-due-date"></div>
-                                <div class="input-group full-width"><label for="asig-notes">Notas</label><textarea
-                                        id="asig-notes" rows="2" placeholder="Observaciones..."></textarea></div>
+                                    </select>
+                                </div>
+                            </div>
+                            <!-- Botón para añadir al carrito -->
+                            <div style="margin-top: 15px; display: flex; justify-content: flex-end;">
+                                <button type="button" id="asig-add-cart-btn" class="btn btn-secondary btn-sm">+ Añadir
+                                    Elemento</button>
+                            </div>
+
+                            <!-- Tabla del Carrito -->
+                            <div class="cart-container" style="margin-top:20px;">
+                                <h5>Elementos a Entregar</h5>
+                                <div class="table-responsive">
+                                    <table id="asig-cart-table" style="min-width: 100%;">
+                                        <thead>
+                                            <tr>
+                                                <th>SKU</th>
+                                                <th>Artículo</th>
+                                                <th>Tipo</th>
+                                                <th>Origen</th>
+                                                <th>Cant.</th>
+                                                <th>Acción</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="asig-cart-body">
+                                            <tr>
+                                                <td colspan="6" class="text-center">Carrito vacío</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                         <!-- Step 3: Firmas -->
@@ -443,9 +482,32 @@
                                 class="search-input">
                             <button id="dev-search-btn" class="btn btn-primary btn-sm">Buscar Asignaciones</button>
                         </div>
-                        <div id="dev-assignments" class="hidden">
-                            <h4>Asignaciones del Empleado</h4>
-                            <div id="dev-assignments-list" class="table-responsive"></div>
+                        <div id="dev-assignments" class="hidden" style="margin-top: 20px;">
+                            <h4>Asignaciones Activas del Empleado</h4>
+                            <div id="dev-assignments-list" class="table-responsive">
+                                <!-- La tabla se genera dinámicamente aquí -->
+                                <table id="dev-active-table" style="min-width: 100%;">
+                                    <thead>
+                                        <tr>
+                                            <th>Seleccionar</th>
+                                            <th>ID Asig.</th>
+                                            <th>Artículo</th>
+                                            <th>Cant. a Devolver</th>
+                                            <th>Estado / Destino</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="dev-active-body">
+                                        <tr>
+                                            <td colspan="5" class="text-center">Buscando...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <!-- Botón para continuar luego de seleccionar -->
+                            <div style="margin-top: 15px; display: flex; justify-content: flex-end;">
+                                <button type="button" id="dev-continue-btn" class="btn btn-secondary btn-sm"
+                                    onclick="ReturnsModule.prepareReturn()">Continuar con Selección →</button>
+                            </div>
                         </div>
                         <div id="dev-form-container" class="hidden">
                             <h4>Registrar Devolución</h4>

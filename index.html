@@ -85,6 +85,8 @@
                         Asignaciones</a></li>
                 <li><a href="#" class="nav-item" data-page="devoluciones"><span class="nav-icon">🔄</span>
                         Devoluciones</a></li>
+                <li><a href="#" class="nav-item" data-page="perfil"><span class="nav-icon">👤</span>
+                        Perfil Empleado</a></li>
                 <li><a href="#" class="nav-item" data-page="disposicion"><span class="nav-icon">🗑️</span>
                         Disposición Final</a></li>
             </ul>
@@ -578,6 +580,117 @@
                 </div>
                 <div id="devoluciones-table-container" class="table-responsive">
                     <p class="loading-text">Cargando historial...</p>
+                </div>
+            </div>
+
+            <!-- ===== PERFIL EMPLEADO PAGE (NUEVO) ===== -->
+            <div id="page-perfil" class="page-content hidden">
+                <div class="page-header">
+                    <h3>Perfil y Kardex del Empleado</h3>
+                </div>
+
+                <!-- Buscador de Perfil -->
+                <div class="search-bar" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <input type="text" id="perfil-search-input" placeholder="🔍 Ingrese Cédula del Empleado..."
+                        class="search-input" style="flex: 1; min-width: 250px;">
+                    <button id="perfil-search-btn" class="btn btn-primary">Buscar Perfil</button>
+                    <button id="perfil-clear-btn" class="btn btn-secondary hidden">Limpiar</button>
+                </div>
+
+                <div id="perfil-content-wrapper" class="hidden" style="margin-top: 20px;">
+                    <!-- Tarjeta Principal del Empleado -->
+                    <div class="glass-card"
+                        style="padding: 20px; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; margin-bottom: 20px;">
+                        <div style="width: 80px; height: 80px; border-radius: 50%; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: bold;"
+                            id="perfil-avatar">
+                            -
+                        </div>
+                        <div style="flex: 1;">
+                            <h2 id="perfil-nombre" style="margin: 0 0 5px 0; color: var(--text-dark);">Nombre del
+                                Empleado</h2>
+                            <p style="margin: 0; color: var(--text-light); font-size: 0.95rem;">
+                                <strong>ID:</strong> <span id="perfil-cedula">-</span> |
+                                <strong>Cargo:</strong> <span id="perfil-cargo">-</span> |
+                                <strong>Sede:</strong> <span id="perfil-sede">-</span><br>
+                                <strong>Área:</strong> <span id="perfil-area">-</span> |
+                                <strong>Estado:</strong> <span id="perfil-estado">-</span>
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Mini KPIs del Empleado -->
+                    <div class="dashboard-grid"
+                        style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 20px;">
+                        <div class="stat-card">
+                            <h4 class="stat-title">Dotación Activa</h4>
+                            <div class="stat-value" id="perfil-stat-activos">0</div>
+                            <div class="stat-trend" style="color: var(--text-light);">Artículos en su poder</div>
+                        </div>
+                        <div class="stat-card">
+                            <h4 class="stat-title">Devoluciones</h4>
+                            <div class="stat-value" id="perfil-stat-devueltos">0</div>
+                            <div class="stat-trend" style="color: var(--text-light);">Histórico total</div>
+                        </div>
+                        <div class="stat-card">
+                            <h4 class="stat-title">Próximos a Vencer</h4>
+                            <div class="stat-value" style="color: var(--warning);" id="perfil-stat-vencidos">0</div>
+                            <div class="stat-trend" style="color: var(--text-light);">Requieren reposición</div>
+                        </div>
+                    </div>
+
+                    <!-- Tablas de Historial -->
+                    <div class="dashboard-grid" style="grid-template-columns: 1fr; gap: 20px;">
+                        <!-- Dotación Activa -->
+                        <div class="glass-card" style="padding: 20px;">
+                            <h4
+                                style="margin-top: 0; margin-bottom: 15px; color: var(--primary); border-bottom: 2px solid var(--border); padding-bottom: 10px;">
+                                📦 Dotación Activa (En su poder)</h4>
+                            <div class="table-responsive">
+                                <table style="min-width: 100%;">
+                                    <thead>
+                                        <tr>
+                                            <th>Fecha Asig.</th>
+                                            <th>SKU</th>
+                                            <th>Artículo</th>
+                                            <th>Cant.</th>
+                                            <th>Vencimiento</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="perfil-activos-body">
+                                        <tr>
+                                            <td colspan="5" class="text-center">Cargando datos...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Histórico General -->
+                        <div class="glass-card" style="padding: 20px;">
+                            <h4
+                                style="margin-top: 0; margin-bottom: 15px; color: var(--text-dark); border-bottom: 2px solid var(--border); padding-bottom: 10px;">
+                                📜 Historial Completo de Movimientos</h4>
+                            <div class="table-responsive">
+                                <table style="min-width: 100%;">
+                                    <thead>
+                                        <tr>
+                                            <th>Fecha</th>
+                                            <th>Movimiento</th>
+                                            <th>Documento</th>
+                                            <th>SKU</th>
+                                            <th>Cant.</th>
+                                            <th>Estado / Notas</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="perfil-historial-body">
+                                        <tr>
+                                            <td colspan="6" class="text-center">Cargando datos...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 

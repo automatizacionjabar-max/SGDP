@@ -105,6 +105,30 @@ function formatDateOnly(dateStr) {
     }
 }
 
+/**
+ * Formatea un string de fecha a DD/MM/YYYY
+ */
+function formatDateDMY(dateStr) {
+    if (!dateStr) return '-';
+    try {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) {
+            // Intento manual para formatos YYYY-MM-DD
+            if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+                const parts = dateStr.split('T')[0].split('-');
+                return `${parts[2]}/${parts[1]}/${parts[0]}`;
+            }
+            return dateStr;
+        }
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+        return `${day}/${month}/${year}`;
+    } catch (e) {
+        return dateStr;
+    }
+}
+
 function showLoader(text = 'Procesando...') {
     const loader = document.getElementById('loader');
     loader.querySelector('.loader-text').textContent = text;
@@ -1220,7 +1244,7 @@ const ReturnsModule = {
                 cart: returnedItems, // Usamos la misma lógica de "cart" en pdf.js
                 signature_emp_b64: this.sigEmp.toBase64(),
                 signature_resp_b64: this.sigResp.toBase64(),
-                responsible_name: api.getUser()?.Nombre || 'Responsable SST'
+                responsible_name: api.getUser()?.Nombre || api.getUser()?.Email || 'Responsable SST'
             };
 
             // Generar PDF (Podría ser mezclado, usamos plantilla de devolución por defecto, 
@@ -1271,7 +1295,7 @@ const ReturnsModule = {
         };
 
         const user = api.getUser();
-        pdfData.responsible_name = user.Nombre || user.Email || 'Responsable SST';
+        pdfData.responsible_name = d.responsible_name || user.Nombre || user.Email || 'Responsable SST';
 
         if (d.item_condition === 'Bueno') {
             generateReturnPDF(pdfData);
@@ -1512,7 +1536,7 @@ const EmployeeProfileModule = {
 
     calculateAndRenderKardex() {
         let activosCounter = 0;
-        let vencidosCounter = 0;
+        let proximoVencerCounter = 0;
         let devueltosCounter = 0;
 
         // Estructuras para Tablas
@@ -1526,16 +1550,18 @@ const EmployeeProfileModule = {
         // Map para agrupar devoluciones por 'asigOriginalId'
         const devMap = {};
         this.returns.forEach(d => {
-            const asid = d.asigOriginalId || d.dev_id; // Fallback
+            const asid = d.asigOriginalId;
             const qty = parseInt(d.quantity) || 0;
-            if (!devMap[asid]) devMap[asid] = 0;
-            devMap[asid] += qty;
+            if (asid) {
+                if (!devMap[asid]) devMap[asid] = 0;
+                devMap[asid] += qty;
+            }
             devueltosCounter += qty;
 
             // Render Devolucion en Historial Inmediatamente
             const condBadge = d.item_condition === 'Bueno' ? 'badge-success' : d.item_condition === 'Regular' ? 'badge-warning' : 'badge-danger';
             tbodyHistorial += `<tr>
-                <td>${formatDateOnly(d.timestamp)}</td>
+                <td>${formatDateDMY(d.timestamp)}</td>
                 <td><span class="badge badge-warning">DEVOLUCIÓN</span></td>
                 <td><small>${d.dev_id}</small></td>
                 <td>${d.sku}</td>
@@ -1549,11 +1575,11 @@ const EmployeeProfileModule = {
             const id = a.ID_Asignacion;
             const cantOtorgada = parseInt(a.Cantidad) || 0;
             const cantDevuelta = devMap[id] || 0;
-            const saldoActivo = cantOtorgada - cantDevuelta;
+            const saldoActivo = Math.max(0, cantOtorgada - cantDevuelta);
 
-            // Render Asignacion en Historial Inmediatamente
+            // Render Asignacion en Historial
             tbodyHistorial += `<tr>
-                <td>${formatDateOnly(a.Timestamp)}</td>
+                <td>${formatDateDMY(a.Timestamp)}</td>
                 <td><span class="badge badge-primary">ASIGNACIÓN</span></td>
                 <td><small>${a.ID_Asignacion}</small></td>
                 <td>${a.SKU}</td>
@@ -1564,22 +1590,33 @@ const EmployeeProfileModule = {
             if (saldoActivo > 0) {
                 activosCounter += saldoActivo;
 
-                // Chequear Vencimiento
+                // Chequear Vencimiento (Lógica 30, 15, 5 días)
                 let badgeVenc = '<span class="badge badge-success">Vigente</span>';
                 if (a.ProximoVencimiento) {
-                    const fVenc = new Date(a.ProximoVencimiento + 'T00:00:00'); // Forza local
-                    if (fVenc < hoy) {
-                        vencidosCounter++;
-                        badgeVenc = `<span class="badge badge-danger">Vencido (${formatDateOnly(a.ProximoVencimiento)})</span>`;
+                    const fVenc = new Date(a.ProximoVencimiento + 'T00:00:00');
+                    const diffTime = fVenc - hoy;
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                    if (diffDays < 0) {
+                        badgeVenc = `<span class="badge badge-danger">Vencido (${formatDateDMY(a.ProximoVencimiento)})</span>`;
+                    } else if (diffDays <= 30) {
+                        proximoVencerCounter++;
+                        let alertClass = 'badge-warning'; // 16-30 días
+                        if (diffDays <= 5) alertClass = 'badge-danger'; // 0-5 días critic
+                        else if (diffDays <= 15) alertClass = 'badge-orange'; // 6-15 días (necesita CSS o use style)
+                        
+                        const colorStyle = diffDays <= 5 ? 'background:#ef4444' : diffDays <= 15 ? 'background:#f97316' : 'background:#facc15;color:#000';
+                        
+                        badgeVenc = `<span class="badge" style="${colorStyle};color:white;">Vence en ${diffDays} días (${formatDateDMY(a.ProximoVencimiento)})</span>`;
                     } else {
-                        badgeVenc = formatDateOnly(a.ProximoVencimiento);
+                        badgeVenc = formatDateDMY(a.ProximoVencimiento);
                     }
                 } else {
                     badgeVenc = 'No Aplica';
                 }
 
                 tbodyActivos += `<tr>
-                    <td>${formatDateOnly(a.Timestamp)}</td>
+                    <td>${formatDateDMY(a.Timestamp)}</td>
                     <td>${a.SKU}</td>
                     <td>${a.ItemNombre}</td>
                     <td><strong>${saldoActivo}</strong> (de ${cantOtorgada})</td>
@@ -1595,12 +1632,12 @@ const EmployeeProfileModule = {
         // Pintar Stats
         document.getElementById('perfil-stat-activos').textContent = activosCounter;
         document.getElementById('perfil-stat-devueltos').textContent = devueltosCounter;
-        document.getElementById('perfil-stat-vencidos').textContent = vencidosCounter;
+        document.getElementById('perfil-stat-vencidos').textContent = proximoVencerCounter; // Ahora cuenta los próximos a vencer
 
         // Pintar Tablas
         document.getElementById('perfil-activos-body').innerHTML = tbodyActivos;
 
-        // *Truco: Historial Inverso
+        // Historial Inverso
         const rowArray = tbodyHistorial.replace(/<\/tr>/g, '</tr>|').split('|').filter(r => r.trim() !== '');
         if (this.assignments.length > 0 || this.returns.length > 0) {
             document.getElementById('perfil-historial-body').innerHTML = rowArray.reverse().join('');

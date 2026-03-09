@@ -126,12 +126,36 @@ function populateSelect(selectId, options, placeholder = 'Seleccione...') {
 }
 
 // ===================================================================
+// GLOBAL STATE MANAGEMENT
+// ===================================================================
+const AppState = {
+    user: null,
+    currentEmployee: null,
+    inventory: [],
+    
+    // Guardar en localStorage para persistencia básica
+    save() {
+        localStorage.setItem('sgdp_state', JSON.stringify({
+            currentEmployee: this.currentEmployee
+        }));
+    },
+    
+    load() {
+        try {
+            const saved = JSON.parse(localStorage.getItem('sgdp_state') || '{}');
+            this.currentEmployee = saved.currentEmployee || null;
+        } catch (e) { this.currentEmployee = null; }
+    }
+};
+
+// ===================================================================
 // APP — Main Controller
 // ===================================================================
 const App = {
     currentPage: 'dashboard',
 
     init() {
+        AppState.load();
         this.bindEvents();
         this.checkConnectivity();
         if (api.getToken()) this.showApp();
@@ -1449,16 +1473,18 @@ const EmployeeProfileModule = {
         }
 
         this.employeeData = empRes.data;
+        AppState.currentEmployee = empRes.data;
+        AppState.save();
 
-        // 2 & 3. Parallell Fetch: All Asignments & All Returns for logic crossing
+        // 2 & 3. Optimized Parallell Fetch: Filtered Asignments & Filtered Returns
         try {
             const [asigRes, devRes] = await Promise.all([
-                api.request('getAllAsignaciones', {}, true),
-                api.request('getAllDevoluciones', {}, true)
+                api.request('getAsignacionesByEmployee', { employeeId: query }),
+                api.request('getDevolucionesByEmployee', { employeeId: query })
             ]);
 
-            this.assignments = (asigRes?.data || []).filter(a => String(a.ID_Empleado) === String(query));
-            this.returns = (devRes?.data || []).filter(d => String(d.employee_id) === String(query));
+            this.assignments = asigRes?.data || [];
+            this.returns = devRes?.data || [];
 
             this.renderProfile();
         } catch (error) {

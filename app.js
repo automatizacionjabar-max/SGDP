@@ -88,6 +88,23 @@ function showToast(message, type = 'success') {
     setTimeout(() => toast.remove(), 4000);
 }
 
+/**
+ * Formatea un string de fecha (ISO o similar) a YYYY-MM-DD
+ */
+function formatDateOnly(dateStr) {
+    if (!dateStr) return '';
+    try {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    } catch (e) {
+        return dateStr;
+    }
+}
+
 function showLoader(text = 'Procesando...') {
     const loader = document.getElementById('loader');
     loader.querySelector('.loader-text').textContent = text;
@@ -800,6 +817,10 @@ const AssignmentsModule = {
             .filter(c => c.sku === sku && c.origin === origin)
             .reduce((sum, c) => sum + parseInt(c.quantity), 0);
 
+        if (available <= 0) {
+            return showToast(`No hay stock disponible para '${origin}'.`, 'error');
+        }
+
         if (available < (qty + inCartQty)) {
             return showToast(`Stock insuficiente en '${origin}'. Disponible: ${available - inCartQty}`, 'error');
         }
@@ -1473,7 +1494,7 @@ const EmployeeProfileModule = {
     calculateAndRenderKardex() {
         let activosCounter = 0;
         let vencidosCounter = 0;
-        const devueltosCounter = this.returns.length;
+        let devueltosCounter = 0;
 
         // Estructuras para Tablas
         let tbodyActivos = '';
@@ -1487,13 +1508,15 @@ const EmployeeProfileModule = {
         const devMap = {};
         this.returns.forEach(d => {
             const asid = d.asigOriginalId || d.dev_id; // Fallback
+            const qty = parseInt(d.quantity) || 0;
             if (!devMap[asid]) devMap[asid] = 0;
-            devMap[asid] += parseInt(d.quantity) || 0;
+            devMap[asid] += qty;
+            devueltosCounter += qty;
 
             // Render Devolucion en Historial Inmediatamente
             const condBadge = d.item_condition === 'Bueno' ? 'badge-success' : d.item_condition === 'Regular' ? 'badge-warning' : 'badge-danger';
             tbodyHistorial += `<tr>
-                <td>${d.timestamp.split(' ')[0]}</td>
+                <td>${formatDateOnly(d.timestamp)}</td>
                 <td><span class="badge badge-warning">DEVOLUCIÓN</span></td>
                 <td><small>${d.dev_id}</small></td>
                 <td>${d.sku}</td>
@@ -1511,7 +1534,7 @@ const EmployeeProfileModule = {
 
             // Render Asignacion en Historial Inmediatamente
             tbodyHistorial += `<tr>
-                <td>${a.Timestamp.split(' ')[0]}</td>
+                <td>${formatDateOnly(a.Timestamp)}</td>
                 <td><span class="badge badge-primary">ASIGNACIÓN</span></td>
                 <td><small>${a.ID_Asignacion}</small></td>
                 <td>${a.SKU}</td>
@@ -1528,16 +1551,16 @@ const EmployeeProfileModule = {
                     const fVenc = new Date(a.ProximoVencimiento + 'T00:00:00'); // Forza local
                     if (fVenc < hoy) {
                         vencidosCounter++;
-                        badgeVenc = `<span class="badge badge-danger">Vencido</span>`;
+                        badgeVenc = `<span class="badge badge-danger">Vencido (${formatDateOnly(a.ProximoVencimiento)})</span>`;
                     } else {
-                        badgeVenc = a.ProximoVencimiento;
+                        badgeVenc = formatDateOnly(a.ProximoVencimiento);
                     }
                 } else {
                     badgeVenc = 'No Aplica';
                 }
 
                 tbodyActivos += `<tr>
-                    <td>${a.Timestamp.split(' ')[0]}</td>
+                    <td>${formatDateOnly(a.Timestamp)}</td>
                     <td>${a.SKU}</td>
                     <td>${a.ItemNombre}</td>
                     <td><strong>${saldoActivo}</strong> (de ${cantOtorgada})</td>

@@ -1539,111 +1539,101 @@ const EmployeeProfileModule = {
         let proximoVencerCounter = 0;
         let devueltosCounter = 0;
 
-        // Estructuras para Tablas
         let tbodyActivos = '';
         let tbodyHistorial = '';
 
-        // Fechas Helper
         const hoy = new Date();
         hoy.setHours(0, 0, 0, 0);
 
-        // Map para agrupar devoluciones por 'asigOriginalId'
-        const devMap = {};
-        this.returns.forEach(d => {
-            const asid = d.asigOriginalId;
-            const qty = parseInt(d.quantity) || 0;
-            if (asid) {
-                if (!devMap[asid]) devMap[asid] = 0;
-                devMap[asid] += qty;
+        function parseFecha(val) {
+            if (!val) return null;
+            const s = String(val).trim();
+            const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (m) return new Date(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3]));
+            const n = parseFloat(s);
+            if (!isNaN(n) && n > 1000) {
+                const b = new Date(1899, 11, 30);
+                b.setDate(b.getDate() + Math.floor(n));
+                b.setHours(0, 0, 0, 0);
+                return b;
             }
-            devueltosCounter += qty;
+            return null;
+        }
 
-            // Render Devolucion en Historial Inmediatamente
-            const condBadge = d.item_condition === 'Bueno' ? 'badge-success' : d.item_condition === 'Regular' ? 'badge-warning' : 'badge-danger';
-            tbodyHistorial += `<tr>
-                <td>${formatDateDMY(d.timestamp)}</td>
-                <td><span class="badge badge-warning">DEVOLUCIÓN</span></td>
-                <td><small>${d.dev_id}</small></td>
-                <td>${d.sku}</td>
-                <td>${d.quantity}</td>
-                <td><span class="badge ${condBadge}">${d.item_condition}</span></td>
-            </tr>`;
+        const devMap = {};
+        const devMapBySku = {};
+
+        this.returns.forEach(d => {
+            const qty = parseInt(d.quantity) || 0;
+            devueltosCounter += qty;
+            const asid = (d.asigOriginalId || '').trim();
+            const dSku = (d.sku || '').trim();
+            if (asid) {
+                const key = asid + '::' + dSku;
+                devMap[key] = (devMap[key] || 0) + qty;
+            } else {
+                devMapBySku[dSku] = (devMapBySku[dSku] || 0) + qty;
+            }
+            const cBadge = d.item_condition === 'Bueno' ? 'badge-success' : d.item_condition === 'Regular' ? 'badge-warning' : 'badge-danger';
+            tbodyHistorial += `<tr><td>${formatDateDMY(d.timestamp)}</td><td><span class="badge badge-warning">DEVOLUCIÓN</span></td><td><small>${d.dev_id || '-'}</small></td><td>${dSku}</td><td>${qty}</td><td><span class="badge ${cBadge}">${d.item_condition}</span></td></tr>`;
         });
 
-        // Loop sobre Asignaciones
+        const skuFallback = Object.assign({}, devMapBySku);
+
         this.assignments.forEach(a => {
-            const id = a.ID_Asignacion;
-            const cantOtorgada = parseInt(a.Cantidad) || 0;
-            const cantDevuelta = devMap[id] || 0;
-            const saldoActivo = Math.max(0, cantOtorgada - cantDevuelta);
+            const id = (a.ID_Asignacion || '').trim();
+            const aSku = (a.SKU || '').trim();
+            const cantO = parseInt(a.Cantidad) || 0;
+            const k = id + '::' + aSku;
+            const dD = devMap[k] || 0;
+            let dF = 0;
+            if (skuFallback[aSku] > 0) {
+                dF = Math.min(skuFallback[aSku], Math.max(0, cantO - dD));
+                skuFallback[aSku] -= dF;
+            }
+            const cantD = dD + dF;
+            const saldo = Math.max(0, cantO - cantD);
 
-            // Render Asignacion en Historial
-            tbodyHistorial += `<tr>
-                <td>${formatDateDMY(a.Timestamp)}</td>
-                <td><span class="badge badge-primary">ASIGNACIÓN</span></td>
-                <td><small>${a.ID_Asignacion}</small></td>
-                <td>${a.SKU}</td>
-                <td>${a.Cantidad}</td>
-                <td>${a.TipoEntrega || 'Dotación'}</td>
-            </tr>`;
+            tbodyHistorial += `<tr><td>${formatDateDMY(a.Timestamp)}</td><td><span class="badge badge-primary">ASIGNACIÓN</span></td><td><small>${a.ID_Asignacion}</small></td><td>${aSku}</td><td>${cantO}</td><td>${a.TipoEntrega || 'Dotación'}</td></tr>`;
 
-            if (saldoActivo > 0) {
-                activosCounter += saldoActivo;
-
-                // Chequear Vencimiento (Lógica 30, 15, 5 días)
-                let badgeVenc = '<span class="badge badge-success">Vigente</span>';
+            if (saldo > 0) {
+                activosCounter += saldo;
+                let bVenc = '<span class="badge badge-success">Vigente</span>';
                 if (a.ProximoVencimiento) {
-                    const fVenc = new Date(a.ProximoVencimiento + 'T00:00:00');
-                    const diffTime = fVenc - hoy;
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-                    if (diffDays < 0) {
-                        badgeVenc = `<span class="badge badge-danger">Vencido (${formatDateDMY(a.ProximoVencimiento)})</span>`;
-                    } else if (diffDays <= 30) {
-                        proximoVencerCounter++;
-                        let alertClass = 'badge-warning'; // 16-30 días
-                        if (diffDays <= 5) alertClass = 'badge-danger'; // 0-5 días critic
-                        else if (diffDays <= 15) alertClass = 'badge-orange'; // 6-15 días (necesita CSS o use style)
-                        
-                        const colorStyle = diffDays <= 5 ? 'background:#ef4444' : diffDays <= 15 ? 'background:#f97316' : 'background:#facc15;color:#000';
-                        
-                        badgeVenc = `<span class="badge" style="${colorStyle};color:white;">Vence en ${diffDays} días (${formatDateDMY(a.ProximoVencimiento)})</span>`;
+                    const fV = parseFecha(a.ProximoVencimiento);
+                    if (!fV) {
+                        bVenc = formatDateDMY(a.ProximoVencimiento);
                     } else {
-                        badgeVenc = formatDateDMY(a.ProximoVencimiento);
+                        const diff = Math.ceil((fV - hoy) / 86400000);
+                        if (diff < 0) {
+                            // Vencido: no lo contamos en el stat de "Próximos a Vencer" para no inflar alarmas
+                            bVenc = `<span class="badge badge-danger">Vencido (${formatDateDMY(a.ProximoVencimiento)})</span>`;
+                        } else if (diff <= 30) {
+                            proximoVencerCounter++;
+                            const color = diff <= 5 ? '#ef4444' : diff <= 15 ? '#f97316' : '#facc15';
+                            const tColor = diff <= 15 ? 'white' : 'black';
+                            bVenc = `<span class="badge" style="background:${color};color:${tColor};">Vence en ${diff} d (${formatDateDMY(a.ProximoVencimiento)})</span>`;
+                        } else {
+                            bVenc = formatDateDMY(a.ProximoVencimiento);
+                        }
                     }
                 } else {
-                    badgeVenc = 'No Aplica';
+                    bVenc = '<span style="color:var(--text-light);">No aplica</span>';
                 }
-
-                tbodyActivos += `<tr>
-                    <td>${formatDateDMY(a.Timestamp)}</td>
-                    <td>${a.SKU}</td>
-                    <td>${a.ItemNombre}</td>
-                    <td><strong>${saldoActivo}</strong> (de ${cantOtorgada})</td>
-                    <td>${badgeVenc}</td>
-                </tr>`;
+                tbodyActivos += `<tr><td>${formatDateDMY(a.Timestamp)}</td><td>${aSku}</td><td>${a.ItemNombre}</td><td><strong>${saldo}</strong> <small>(de ${cantO})</small></td><td>${bVenc}</td></tr>`;
             }
         });
 
-        // Check vacios
-        if (tbodyActivos === '') tbodyActivos = '<tr><td colspan="5" class="text-center">No tiene elementos activos en su poder.</td></tr>';
-        if (tbodyHistorial === '') tbodyHistorial = '<tr><td colspan="6" class="text-center">El empleado no tiene movimientos registrados.</td></tr>';
+        if (tbodyActivos === '') tbodyActivos = '<tr><td colspan="5" class="text-center">No hay elementos activos.</td></tr>';
+        if (tbodyHistorial === '') tbodyHistorial = '<tr><td colspan="6" class="text-center">Sin movimientos.</td></tr>';
 
-        // Pintar Stats
         document.getElementById('perfil-stat-activos').textContent = activosCounter;
         document.getElementById('perfil-stat-devueltos').textContent = devueltosCounter;
-        document.getElementById('perfil-stat-vencidos').textContent = proximoVencerCounter; // Ahora cuenta los próximos a vencer
-
-        // Pintar Tablas
+        document.getElementById('perfil-stat-vencidos').textContent = proximoVencerCounter;
         document.getElementById('perfil-activos-body').innerHTML = tbodyActivos;
 
-        // Historial Inverso
-        const rowArray = tbodyHistorial.replace(/<\/tr>/g, '</tr>|').split('|').filter(r => r.trim() !== '');
-        if (this.assignments.length > 0 || this.returns.length > 0) {
-            document.getElementById('perfil-historial-body').innerHTML = rowArray.reverse().join('');
-        } else {
-            document.getElementById('perfil-historial-body').innerHTML = tbodyHistorial;
-        }
+        const rowArr = tbodyHistorial.split('</tr>').filter(r => r.trim() !== '').map(r => r + '</tr>');
+        document.getElementById('perfil-historial-body').innerHTML = rowArr.reverse().join('');
     }
 };
 

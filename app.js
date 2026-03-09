@@ -1543,150 +1543,101 @@ const EmployeeProfileModule = {
         let tbodyActivos = '';
         let tbodyHistorial = '';
 
-        // Hoy a medianoche — ignorar diferencias de hora/zona
+        // Fechas Helper
         const hoy = new Date();
         hoy.setHours(0, 0, 0, 0);
 
-        /**
-         * Parsea de forma segura una fecha que puede venir como:
-         *   "2026-04-01", "2026-04-01 00:00:00", "2026-04-01T...", número serial Sheets
-         * Retorna Date apuntando a medianoche local, o null si no parseable.
-         */
-        function parseFechaSafe(valor) {
-            if (!valor) return null;
-            const str = String(valor).trim();
-            // Extraer solo YYYY-MM-DD aunque venga con timestamp
-            const match = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
-            if (match) {
-                // new Date(year, monthIndex, day) — siempre horario local
-                return new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]));
-            }
-            // Número serial de Google Sheets (días desde 30-dic-1899)
-            const num = parseFloat(str);
-            if (!isNaN(num) && num > 1000) {
-                const base = new Date(1899, 11, 30);
-                base.setDate(base.getDate() + Math.floor(num));
-                base.setHours(0, 0, 0, 0);
-                return base;
-            }
-            return null;
-        }
-
-        // ================================================================
-        // PASO 1: Mapa de devoluciones con CLAVE COMPUESTA (asigId::sku)
-        // Esto evita que devoluciones de distintos artículos se mezclen.
-        // Fallback por SKU para devoluciones antiguas sin asigOriginalId.
-        // ================================================================
-        const devMap = {};        // "asigId::sku" → qty
-        const devMapBySku = {};   // "sku" → qty (fallback)
-
+        // Map para agrupar devoluciones por 'asigOriginalId'
+        const devMap = {};
         this.returns.forEach(d => {
+            const asid = d.asigOriginalId;
             const qty = parseInt(d.quantity) || 0;
+            if (asid) {
+                if (!devMap[asid]) devMap[asid] = 0;
+                devMap[asid] += qty;
+            }
             devueltosCounter += qty;
 
-            const asid = (d.asigOriginalId || '').trim();
-            const dSku = (d.sku || '').trim();
-
-            if (asid) {
-                const key = asid + '::' + dSku;
-                devMap[key] = (devMap[key] || 0) + qty;
-            } else {
-                // Sin referencia de asignación: acumular por SKU como fallback FIFO
-                devMapBySku[dSku] = (devMapBySku[dSku] || 0) + qty;
-            }
-
-            // Render Devolución en Historial
-            const condBadge = d.item_condition === 'Bueno' ? 'badge-success'
-                : d.item_condition === 'Regular' ? 'badge-warning' : 'badge-danger';
-            tbodyHistorial += `<tr>\n                <td>${formatDateDMY(d.timestamp)}</td>\n                <td><span class="badge badge-warning">DEVOLUCIÓN</span></td>\n                <td><small>${d.dev_id || '-'}</small></td>\n                <td>${dSku}</td>\n                <td>${qty}</td>\n                <td><span class="badge ${condBadge}">${d.item_condition}</span></td>\n            </tr>`;
+            // Render Devolucion en Historial Inmediatamente
+            const condBadge = d.item_condition === 'Bueno' ? 'badge-success' : d.item_condition === 'Regular' ? 'badge-warning' : 'badge-danger';
+            tbodyHistorial += `<tr>
+                <td>${formatDateDMY(d.timestamp)}</td>
+                <td><span class="badge badge-warning">DEVOLUCIÓN</span></td>
+                <td><small>${d.dev_id}</small></td>
+                <td>${d.sku}</td>
+                <td>${d.quantity}</td>
+                <td><span class="badge ${condBadge}">${d.item_condition}</span></td>
+            </tr>`;
         });
 
-        // ================================================================
-        // PASO 2: Loop sobre Asignaciones — calcular saldo real
-        // Aplicar fallback FIFO: las devoluciones sin asigOriginalId se
-        // descuentan de la asignación más antigua con el mismo SKU.
-        // ================================================================
-        const skuFallbackRestante = Object.assign({}, devMapBySku);
-
+        // Loop sobre Asignaciones
         this.assignments.forEach(a => {
-            const id = (a.ID_Asignacion || '').trim();
-            const aSku = (a.SKU || '').trim();
+            const id = a.ID_Asignacion;
             const cantOtorgada = parseInt(a.Cantidad) || 0;
-
-            // Devoluciones directas (clave compuesta)
-            const keyCompuesta = id + '::' + aSku;
-            const devDirecta = devMap[keyCompuesta] || 0;
-
-            // Devoluciones fallback por SKU (FIFO)
-            let devFallback = 0;
-            if (skuFallbackRestante[aSku] > 0) {
-                const disponibleParaDescontar = Math.max(0, cantOtorgada - devDirecta);
-                devFallback = Math.min(skuFallbackRestante[aSku], disponibleParaDescontar);
-                skuFallbackRestante[aSku] -= devFallback;
-            }
-
-            const cantDevuelta = devDirecta + devFallback;
+            const cantDevuelta = devMap[id] || 0;
             const saldoActivo = Math.max(0, cantOtorgada - cantDevuelta);
 
-            // Render Asignación en Historial
-            tbodyHistorial += `<tr>\n                <td>${formatDateDMY(a.Timestamp)}</td>\n                <td><span class="badge badge-primary">ASIGNACIÓN</span></td>\n                <td><small>${a.ID_Asignacion}</small></td>\n                <td>${aSku}</td>\n                <td>${cantOtorgada}</td>\n                <td>${a.TipoEntrega || 'Dotación'}</td>\n            </tr>`;
+            // Render Asignacion en Historial
+            tbodyHistorial += `<tr>
+                <td>${formatDateDMY(a.Timestamp)}</td>
+                <td><span class="badge badge-primary">ASIGNACIÓN</span></td>
+                <td><small>${a.ID_Asignacion}</small></td>
+                <td>${a.SKU}</td>
+                <td>${a.Cantidad}</td>
+                <td>${a.TipoEntrega || 'Dotación'}</td>
+            </tr>`;
 
             if (saldoActivo > 0) {
                 activosCounter += saldoActivo;
 
-                // ========================================================
-                // VENCIMIENTO — Parseo seguro independiente de formato
-                // ========================================================
+                // Chequear Vencimiento (Lógica 30, 15, 5 días)
                 let badgeVenc = '<span class="badge badge-success">Vigente</span>';
-
                 if (a.ProximoVencimiento) {
-                    const fVenc = parseFechaSafe(a.ProximoVencimiento);
-                    if (!fVenc) {
-                        badgeVenc = formatDateDMY(a.ProximoVencimiento);
-                    } else {
-                        const diffMs = fVenc - hoy;
-                        const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+                    const fVenc = new Date(a.ProximoVencimiento + 'T00:00:00');
+                    const diffTime = fVenc - hoy;
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-                        if (diffDays < 0) {
-                            proximoVencerCounter++;
-                            badgeVenc = `<span class="badge badge-danger">⚠ Vencido (${formatDateDMY(a.ProximoVencimiento)})</span>`;
-                        } else if (diffDays <= 5) {
-                            proximoVencerCounter++;
-                            badgeVenc = `<span class="badge" style="background:#ef4444;color:white;">🔴 Vence en ${diffDays} día(s) (${formatDateDMY(a.ProximoVencimiento)})</span>`;
-                        } else if (diffDays <= 15) {
-                            proximoVencerCounter++;
-                            badgeVenc = `<span class="badge" style="background:#f97316;color:white;">🟠 Vence en ${diffDays} días (${formatDateDMY(a.ProximoVencimiento)})</span>`;
-                        } else if (diffDays <= 30) {
-                            proximoVencerCounter++;
-                            badgeVenc = `<span class="badge" style="background:#facc15;color:#000;">🟡 Vence en ${diffDays} días (${formatDateDMY(a.ProximoVencimiento)})</span>`;
-                        } else {
-                            // Más de 30 días: no alarmar, solo mostrar fecha
-                            badgeVenc = formatDateDMY(a.ProximoVencimiento);
-                        }
+                    if (diffDays < 0) {
+                        badgeVenc = `<span class="badge badge-danger">Vencido (${formatDateDMY(a.ProximoVencimiento)})</span>`;
+                    } else if (diffDays <= 30) {
+                        proximoVencerCounter++;
+                        let alertClass = 'badge-warning'; // 16-30 días
+                        if (diffDays <= 5) alertClass = 'badge-danger'; // 0-5 días critic
+                        else if (diffDays <= 15) alertClass = 'badge-orange'; // 6-15 días (necesita CSS o use style)
+                        
+                        const colorStyle = diffDays <= 5 ? 'background:#ef4444' : diffDays <= 15 ? 'background:#f97316' : 'background:#facc15;color:#000';
+                        
+                        badgeVenc = `<span class="badge" style="${colorStyle};color:white;">Vence en ${diffDays} días (${formatDateDMY(a.ProximoVencimiento)})</span>`;
+                    } else {
+                        badgeVenc = formatDateDMY(a.ProximoVencimiento);
                     }
                 } else {
-                    badgeVenc = '<span style="color:var(--text-muted);">No aplica</span>';
+                    badgeVenc = 'No Aplica';
                 }
 
-                tbodyActivos += `<tr>\n                    <td>${formatDateDMY(a.Timestamp)}</td>\n                    <td>${aSku}</td>\n                    <td>${a.ItemNombre}</td>\n                    <td><strong>${saldoActivo}</strong> <small style="color:var(--text-muted);">(de ${cantOtorgada} asign.)</small></td>\n                    <td>${badgeVenc}</td>\n                </tr>`;
+                tbodyActivos += `<tr>
+                    <td>${formatDateDMY(a.Timestamp)}</td>
+                    <td>${a.SKU}</td>
+                    <td>${a.ItemNombre}</td>
+                    <td><strong>${saldoActivo}</strong> (de ${cantOtorgada})</td>
+                    <td>${badgeVenc}</td>
+                </tr>`;
             }
         });
 
-        // Filas vacías
-        if (tbodyActivos === '')
-            tbodyActivos = '<tr><td colspan="5" class="text-center" style="color:var(--success);">✅ No tiene elementos activos en su poder.</td></tr>';
-        if (tbodyHistorial === '')
-            tbodyHistorial = '<tr><td colspan="6" class="text-center">El empleado no tiene movimientos registrados.</td></tr>';
+        // Check vacios
+        if (tbodyActivos === '') tbodyActivos = '<tr><td colspan="5" class="text-center">No tiene elementos activos en su poder.</td></tr>';
+        if (tbodyHistorial === '') tbodyHistorial = '<tr><td colspan="6" class="text-center">El empleado no tiene movimientos registrados.</td></tr>';
 
         // Pintar Stats
         document.getElementById('perfil-stat-activos').textContent = activosCounter;
         document.getElementById('perfil-stat-devueltos').textContent = devueltosCounter;
-        document.getElementById('perfil-stat-vencidos').textContent = proximoVencerCounter;
+        document.getElementById('perfil-stat-vencidos').textContent = proximoVencerCounter; // Ahora cuenta los próximos a vencer
 
         // Pintar Tablas
         document.getElementById('perfil-activos-body').innerHTML = tbodyActivos;
 
-        // Historial en orden inverso (más reciente primero)
+        // Historial Inverso
         const rowArray = tbodyHistorial.replace(/<\/tr>/g, '</tr>|').split('|').filter(r => r.trim() !== '');
         if (this.assignments.length > 0 || this.returns.length > 0) {
             document.getElementById('perfil-historial-body').innerHTML = rowArray.reverse().join('');

@@ -498,18 +498,11 @@ const EmpleadosModule = {
             populateSelect('emp-area', r.data.areas || []);
             populateSelect('emp-sede', r.data.sedes || []);
             // Empresa: puede venir en r.data.empresas o leerse de la hoja Listas columna G
-            const empresas = r.data.empresas || r.data.empresa || [];
+            const empresas = r.data.empresas || [];
             if (empresas.length > 0) {
                 populateSelect('emp-empresa', empresas);
             } else {
-                // Fallback: intentar leer directamente la lista de empresas
-                const fallback = await api.request('getLista', { hoja: 'Listas', columna: 'G', encabezado: 'Empresa' }, true);
-                if (fallback && fallback.success) {
-                    populateSelect('emp-empresa', fallback.data || []);
-                } else {
-                    // Fallback manual mientras el backend se actualiza
-                    populateSelect('emp-empresa', ['Empresa Principal', 'Contratista', 'Temporal']);
-                }
+                populateSelect('emp-empresa', ['No se cargaron empresas']);
             }
             return r.data;
         }

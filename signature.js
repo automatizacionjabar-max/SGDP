@@ -3,11 +3,22 @@
  * Captura de firma digital táctil + mouse usando Canvas API
  */
 class SignaturePad {
-  constructor(canvasId) {
-    this.canvas = document.getElementById(canvasId);
-    if (!this.canvas) return;
+  constructor(canvasParam, options = {}) {
+    this.canvas = typeof canvasParam === 'string' 
+      ? document.getElementById(canvasParam) 
+      : canvasParam;
+      
+    if (!this.canvas) {
+      console.error('SignaturePad: Canvas element not found', canvasParam);
+      return;
+    }
 
     this.ctx = this.canvas.getContext('2d');
+    this.options = Object.assign({
+      penColor: '#1a237e',
+      lineWidth: 3.0
+    }, options);
+
     this.isDrawing = false;
     this.lastX = 0;
     this.lastY = 0;
@@ -26,8 +37,8 @@ class SignaturePad {
     this.ctx.scale(dpr, dpr);
 
     // Estilo de la línea (firma profesional)
-    this.ctx.strokeStyle = '#1a237e'; // Azul Marino Profesional
-    this.ctx.lineWidth = 3.0;
+    this.ctx.strokeStyle = this.options.penColor;
+    this.ctx.lineWidth = this.options.lineWidth;
     this.ctx.lineCap = 'round';
     this.ctx.lineJoin = 'round';
   }

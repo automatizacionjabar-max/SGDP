@@ -1498,7 +1498,7 @@ const EmployeeProfileModule = {
             document.getElementById('perfil-search-btn').classList.add('hidden');
             document.getElementById('perfil-clear-btn').classList.remove('hidden');
 
-            const nombreCompl = employee['Nombre'] || 'Desconocido';
+            const nombreCompl = (`${employee['Nombres'] || ''} ${employee['Apellidos'] || ''}`.trim()) || employee['Nombre'] || 'Desconocido';
             document.getElementById('perfil-nombre').textContent = nombreCompl;
             document.getElementById('perfil-avatar').textContent = nombreCompl.charAt(0).toUpperCase();
             document.getElementById('perfil-cedula').textContent = employee['ID_Empleado'] || query;
@@ -1590,4 +1590,3 @@ const EmployeeProfileModule = {
 // INIT
 // ===================================================================
 document.addEventListener('DOMContentLoaded', () => App.init());
-

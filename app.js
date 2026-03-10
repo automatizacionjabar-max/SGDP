@@ -1590,3 +1590,4 @@ const EmployeeProfileModule = {
 // INIT
 // ===================================================================
 document.addEventListener('DOMContentLoaded', () => App.init());
+

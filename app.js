@@ -6,7 +6,7 @@
 // ===================================================================
 // CONFIGURATION — ¡CAMBIAR ESTA URL DESPUÉS DEL DEPLOY!
 // ===================================================================
-const API_URL = 'https://script.google.com/macros/s/AKfycbyOVwyulSMkr-07J84D-MqigyFVfnUAc2eIIEdKVP7jQZfbaGXWTBOHwXSi8CjMFVV4/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbxTn-xba-tS1P6E5LX2Ac0UFrHdaKwDM7ftZ0-ha87Qkk9Ll14YOy83H6_Ryr5kPim2/exec';
 const DRIVE_FOLDER_ID = '1SshRHJnn1cCaU-7xf6ssmCerzCGihQyx'; // OPCIONAL: ID de carpeta de Google Drive para guardar PDFs
 
 // Ejemplo: 'https://script.google.com/macros/s/AKfycb.../exec'
@@ -1481,11 +1481,11 @@ const EmployeeProfileModule = {
         const query = document.getElementById('perfil-search-input').value.trim();
         if (!query) return showToast('Ingrese una cédula para buscar.', 'warning');
 
-        showLoading('Consultando perfil optimizado...');
+        showLoader('Consultando perfil optimizado...');
         try {
-            const resp = await googleAPI.call('getEmployeeProfile', { employeeId: query });
+            const resp = await api.request('getEmployeeProfile', { employeeId: query });
             if (!resp || !resp.success) {
-                hideLoading();
+                hideLoader();
                 return showToast(resp.message || 'Empleado no encontrado.', 'error');
             }
 
@@ -1516,10 +1516,10 @@ const EmployeeProfileModule = {
             this.renderActivos(activos);
             this.renderHistorial(historial);
 
-            hideLoading();
+            hideLoader();
         } catch (error) {
             console.error("Error en perfil optimizado:", error);
-            hideLoading();
+            hideLoader();
             showToast('Error cargando el historial.', 'warning');
         }
     },

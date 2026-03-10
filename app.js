@@ -1481,160 +1481,108 @@ const EmployeeProfileModule = {
         const query = document.getElementById('perfil-search-input').value.trim();
         if (!query) return showToast('Ingrese una cédula para buscar.', 'warning');
 
-        showLoader('Cargando perfil del empleado...');
-
-        // 1. Fetch Employee Profile
-        const empRes = await api.request('getEmployee', { employeeId: query });
-        if (!empRes || !empRes.success) {
-            hideLoader();
-            return showToast('Empleado no encontrado.', 'error');
-        }
-
-        this.employeeData = empRes.data;
-        AppState.currentEmployee = empRes.data;
-        AppState.save();
-
-        // 2 & 3. Optimized Parallell Fetch: Filtered Asignments & Filtered Returns
+        showLoading('Consultando perfil optimizado...');
         try {
-            const [asigRes, devRes] = await Promise.all([
-                api.request('getAsignacionesByEmployee', { employeeId: query }),
-                api.request('getDevolucionesByEmployee', { employeeId: query })
-            ]);
+            const resp = await googleAPI.call('getEmployeeProfile', { employeeId: query });
+            if (!resp || !resp.success) {
+                hideLoading();
+                return showToast(resp.message || 'Empleado no encontrado.', 'error');
+            }
 
-            this.assignments = asigRes?.data || [];
-            this.returns = devRes?.data || [];
+            const { employee, stats, activos, historial } = resp.data;
+            this.currentEmployee = employee;
 
-            this.renderProfile();
+            // Render Profile Header
+            document.getElementById('perfil-content-wrapper').classList.remove('hidden');
+            document.getElementById('perfil-search-input').disabled = true;
+            document.getElementById('perfil-search-btn').classList.add('hidden');
+            document.getElementById('perfil-clear-btn').classList.remove('hidden');
+
+            const nombreCompl = employee['Nombre'] || 'Desconocido';
+            document.getElementById('perfil-nombre').textContent = nombreCompl;
+            document.getElementById('perfil-avatar').textContent = nombreCompl.charAt(0).toUpperCase();
+            document.getElementById('perfil-cedula').textContent = employee['ID_Empleado'] || query;
+            document.getElementById('perfil-cargo').textContent = employee['Cargo'] || '-';
+            document.getElementById('perfil-sede').textContent = employee['SedePorcicola'] || '-';
+            document.getElementById('perfil-area').textContent = employee['Area'] || '-';
+            document.getElementById('perfil-estado').textContent = employee['Estado'] || 'Activo';
+
+            // Render Stats
+            document.getElementById('perfil-stat-activos').textContent = stats.activos;
+            document.getElementById('perfil-stat-devueltos').textContent = stats.devueltos;
+            document.getElementById('perfil-stat-vencidos').textContent = stats.vencidos;
+
+            // Render Tables
+            this.renderActivos(activos);
+            this.renderHistorial(historial);
+
+            hideLoading();
         } catch (error) {
-            console.error("Error fetching historical data:", error);
+            console.error("Error en perfil optimizado:", error);
+            hideLoading();
             showToast('Error cargando el historial.', 'warning');
-        } finally {
-            hideLoader();
         }
     },
 
-    renderProfile() {
-        // Toggle UI states
-        document.getElementById('perfil-content-wrapper').classList.remove('hidden');
-        document.getElementById('perfil-search-input').disabled = true;
-        document.getElementById('perfil-search-btn').classList.add('hidden');
-        document.getElementById('perfil-clear-btn').classList.remove('hidden');
+    renderActivos(items) {
+        const tbody = document.getElementById('perfil-activos-body');
+        if (!tbody) return;
+        tbody.innerHTML = '';
 
-        // Render Profile Header
-        const e = this.employeeData;
-        const nombreCompl = `${e['Nombres'] || ''} ${e['Apellidos'] || ''}`.trim() || 'Desconocido';
-        document.getElementById('perfil-nombre').textContent = nombreCompl;
-        document.getElementById('perfil-avatar').textContent = nombreCompl.charAt(0).toUpperCase();
-        document.getElementById('perfil-cedula').textContent = e['ID_Empleado'] || '-';
-        document.getElementById('perfil-cargo').textContent = e['Cargo'] || '-';
-        document.getElementById('perfil-sede').textContent = e['SedePorcicola'] || '-';
-        document.getElementById('perfil-area').textContent = e['Area'] || '-';
-        document.getElementById('perfil-estado').textContent = e['Estado'] || 'Activo';
-
-        // Procesar Cruce de Datos (KPIs y Active vs Historical)
-        this.calculateAndRenderKardex();
-    },
-
-    calculateAndRenderKardex() {
-        let activosCounter = 0;
-        let proximoVencerCounter = 0;
-        let devueltosCounter = 0;
-
-        let tbodyActivos = '';
-        let tbodyHistorial = '';
-
-        const hoy = new Date();
-        hoy.setHours(0, 0, 0, 0);
-
-        function parseFecha(val) {
-            if (!val) return null;
-            const s = String(val).trim();
-            const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-            if (m) return new Date(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3]));
-            const n = parseFloat(s);
-            if (!isNaN(n) && n > 1000) {
-                const b = new Date(1899, 11, 30);
-                b.setDate(b.getDate() + Math.floor(n));
-                b.setHours(0, 0, 0, 0);
-                return b;
-            }
-            return null;
+        if (!items || items.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center p-4">Sin dotación activa</td></tr>';
+            return;
         }
 
-        const devMap = {};
-        const devMapBySku = {};
-
-        this.returns.forEach(d => {
-            const qty = parseInt(d.quantity) || 0;
-            devueltosCounter += qty;
-            const asid = String(d.asigOriginalId || '').trim();
-            const dSku = String(d.sku || '').trim();
-            if (asid) {
-                const key = asid + '::' + dSku;
-                devMap[key] = (devMap[key] || 0) + qty;
-            } else {
-                devMapBySku[dSku] = (devMapBySku[dSku] || 0) + qty;
-            }
-            const cBadge = d.item_condition === 'Bueno' ? 'badge-success' : d.item_condition === 'Regular' ? 'badge-warning' : 'badge-danger';
-            tbodyHistorial += `<tr><td>${formatDateDMY(d.timestamp)}</td><td><span class="badge badge-warning">DEVOLUCIÓN</span></td><td><small>${d.dev_id || '-'}</small></td><td>${dSku}</td><td>${qty}</td><td><span class="badge ${cBadge}">${d.item_condition}</span></td></tr>`;
+        items.forEach(it => {
+            const tr = document.createElement('tr');
+            const color = it.diasVence <= 5 ? 'var(--danger-color)' : it.diasVence <= 15 ? 'orange' : 'var(--success-color)';
+            const vencTexto = it.diasVence === -1 ? 'No aplica' : `Vence en ${it.diasVence} días`;
+            
+            tr.innerHTML = `
+                <td>${formatDateDMY(it.fecha)}</td>
+                <td class="font-mono">${it.sku}</td>
+                <td>${it.nombre}</td>
+                <td><strong>${it.cant}</strong> <small>(de ${it.cantOriginal})</small></td>
+                <td><span class="badge" style="background:${color}; color:white;">${vencTexto}</span></td>
+            `;
+            tbody.appendChild(tr);
         });
+    },
 
-        const skuFallback = Object.assign({}, devMapBySku);
+    renderHistorial(historial) {
+        const tbody = document.getElementById('perfil-historial-body');
+        if (!tbody) return;
+        tbody.innerHTML = '';
 
-        this.assignments.forEach(a => {
-            const id = String(a.ID_Asignacion || '').trim();
-            const aSku = String(a.SKU || '').trim();
-            const cantO = parseInt(a.Cantidad) || 0;
-            const k = id + '::' + aSku;
-            const dD = devMap[k] || 0;
-            let dF = 0;
-            if (skuFallback[aSku] > 0) {
-                dF = Math.min(skuFallback[aSku], Math.max(0, cantO - dD));
-                skuFallback[aSku] -= dF;
-            }
-            const cantD = dD + dF;
-            const saldo = Math.max(0, cantO - cantD);
+        if (!historial || historial.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center p-4">Sin movimientos</td></tr>';
+            return;
+        }
 
-            tbodyHistorial += `<tr><td>${formatDateDMY(a.Timestamp)}</td><td><span class="badge badge-primary">ASIGNACIÓN</span></td><td><small>${a.ID_Asignacion}</small></td><td>${aSku}</td><td>${cantO}</td><td>${a.TipoEntrega || 'Dotación'}</td></tr>`;
-
-            if (saldo > 0) {
-                activosCounter += saldo;
-                let bVenc = '<span class="badge badge-success">Vigente</span>';
-                if (a.ProximoVencimiento) {
-                    const fV = parseFecha(a.ProximoVencimiento);
-                    if (!fV) {
-                        bVenc = formatDateDMY(a.ProximoVencimiento);
-                    } else {
-                        const diff = Math.ceil((fV - hoy) / 86400000);
-                        if (diff < 0) {
-                            // Vencido: no lo contamos en el stat de "Próximos a Vencer" para no inflar alarmas
-                            bVenc = `<span class="badge badge-danger">Vencido (${formatDateDMY(a.ProximoVencimiento)})</span>`;
-                        } else if (diff <= 30) {
-                            proximoVencerCounter++;
-                            const color = diff <= 5 ? '#ef4444' : diff <= 15 ? '#f97316' : '#facc15';
-                            const tColor = diff <= 15 ? 'white' : 'black';
-                            bVenc = `<span class="badge" style="background:${color};color:${tColor};">Vence en ${diff} d (${formatDateDMY(a.ProximoVencimiento)})</span>`;
-                        } else {
-                            bVenc = formatDateDMY(a.ProximoVencimiento);
-                        }
-                    }
-                } else {
-                    bVenc = '<span style="color:var(--text-light);">No aplica</span>';
-                }
-                tbodyActivos += `<tr><td>${formatDateDMY(a.Timestamp)}</td><td>${aSku}</td><td>${a.ItemNombre}</td><td><strong>${saldo}</strong> <small>(de ${cantO})</small></td><td>${bVenc}</td></tr>`;
-            }
+        historial.forEach(h => {
+            const isAsig = h.tipo === 'ASIGNACION';
+            const badgeClass = isAsig ? 'badge-primary' : 'badge-warning';
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${formatDateDMY(h.fecha)}</td>
+                <td><span class="badge ${badgeClass}">${h.tipo}</span></td>
+                <td><small>${h.doc}</small></td>
+                <td>${h.sku}</td>
+                <td>${h.cant}</td>
+                <td><span class="badge badge-secondary">${h.estado || '-'}</span></td>
+            `;
+            tbody.appendChild(tr);
         });
+    },
 
-        if (tbodyActivos === '') tbodyActivos = '<tr><td colspan="5" class="text-center">No hay elementos activos.</td></tr>';
-        if (tbodyHistorial === '') tbodyHistorial = '<tr><td colspan="6" class="text-center">Sin movimientos.</td></tr>';
-
-        document.getElementById('perfil-stat-activos').textContent = activosCounter;
-        document.getElementById('perfil-stat-devueltos').textContent = devueltosCounter;
-        document.getElementById('perfil-stat-vencidos').textContent = proximoVencerCounter;
-        document.getElementById('perfil-activos-body').innerHTML = tbodyActivos;
-
-        const rowArr = tbodyHistorial.split('</tr>').filter(r => r.trim() !== '').map(r => r + '</tr>');
-        document.getElementById('perfil-historial-body').innerHTML = rowArr.reverse().join('');
+    clear() {
+        this.currentEmployee = null;
+        document.getElementById('perfil-content-wrapper').classList.add('hidden');
+        document.getElementById('perfil-search-input').disabled = false;
+        document.getElementById('perfil-search-input').value = '';
+        document.getElementById('perfil-search-btn').classList.remove('hidden');
+        document.getElementById('perfil-clear-btn').classList.add('hidden');
     }
 };
 

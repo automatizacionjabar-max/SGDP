@@ -713,9 +713,9 @@ const AssignmentsModule = {
         document.querySelectorAll('.asig-actions').forEach(el => el.classList.remove('hidden'));
 
         setTimeout(() => {
-            const sigOptions = { penColor: "rgb(0, 0, 0)", minWidth: 0.5, maxWidth: 2.5 };
-            this.sigEmp = new SignaturePad(document.getElementById('sig-empleado'), sigOptions);
-            this.sigResp = new SignaturePad(document.getElementById('sig-responsable'), sigOptions);
+            const sigOptions = { penColor: "rgb(0, 0, 0)", lineWidth: 2.0 };
+            this.sigEmp = new SignaturePad('sig-empleado', sigOptions);
+            this.sigResp = new SignaturePad('sig-responsable', sigOptions);
             document.getElementById('clear-sig-emp').onclick = () => this.sigEmp?.clear();
             document.getElementById('clear-sig-resp').onclick = () => this.sigResp?.clear();
         }, 100);
@@ -913,8 +913,9 @@ const AssignmentsModule = {
             document.getElementById('asig-next-btn').classList.add('hidden');
             document.getElementById('asig-save-btn').classList.remove('hidden');
             setTimeout(() => {
-                this.sigEmp = new SignaturePad('sig-empleado');
-                this.sigResp = new SignaturePad('sig-responsable');
+                const sigOptions = { penColor: "#1a237e", lineWidth: 3.0 };
+                this.sigEmp = new SignaturePad('sig-empleado', sigOptions);
+                this.sigResp = new SignaturePad('sig-responsable', sigOptions);
                 document.getElementById('clear-sig-emp').onclick = () => this.sigEmp?.clear();
                 document.getElementById('clear-sig-resp').onclick = () => this.sigResp?.clear();
             }, 200);
@@ -1049,11 +1050,11 @@ const ReturnsModule = {
         if (this.sigResp) this.sigResp.clear();
 
         setTimeout(() => {
-            const sigOptions = { penColor: "rgb(0, 0, 0)", minWidth: 0.5, maxWidth: 2.5 };
+            const sigOptions = { penColor: "rgb(0, 0, 0)", lineWidth: 2.0 };
             const canvasEmp = document.getElementById('sig-dev-emp');
             const canvasResp = document.getElementById('sig-dev-resp');
-            if (canvasEmp) this.sigEmp = new SignaturePad('sig-dev-emp');
-            if (canvasResp) this.sigResp = new SignaturePad('sig-dev-resp');
+            if (canvasEmp) this.sigEmp = new SignaturePad('sig-dev-emp', sigOptions);
+            if (canvasResp) this.sigResp = new SignaturePad('sig-dev-resp', sigOptions);
             const btnClearEmp = document.getElementById('clear-sig-dev-emp');
             const btnClearResp = document.getElementById('clear-sig-dev-resp');
             if (btnClearEmp) btnClearEmp.onclick = () => this.sigEmp?.clear();
@@ -1374,7 +1375,7 @@ const DisposalModule = {
         // Initialize signature pad
         setTimeout(() => {
             const canvas = document.getElementById('sig-disp-resp');
-            if (canvas) this.sigResp = new SignaturePad('sig-disp-resp');
+            if (canvas) this.sigResp = new SignaturePad('sig-disp-resp', { penColor: '#1a237e', lineWidth: 3.0 });
             document.getElementById('clear-sig-disp-resp').onclick = () => this.sigResp?.clear();
         }, 200);
     },
@@ -1566,8 +1567,8 @@ const EmployeeProfileModule = {
         this.returns.forEach(d => {
             const qty = parseInt(d.quantity) || 0;
             devueltosCounter += qty;
-            const asid = (d.asigOriginalId || '').trim();
-            const dSku = (d.sku || '').trim();
+            const asid = String(d.asigOriginalId || '').trim();
+            const dSku = String(d.sku || '').trim();
             if (asid) {
                 const key = asid + '::' + dSku;
                 devMap[key] = (devMap[key] || 0) + qty;
@@ -1581,8 +1582,8 @@ const EmployeeProfileModule = {
         const skuFallback = Object.assign({}, devMapBySku);
 
         this.assignments.forEach(a => {
-            const id = (a.ID_Asignacion || '').trim();
-            const aSku = (a.SKU || '').trim();
+            const id = String(a.ID_Asignacion || '').trim();
+            const aSku = String(a.SKU || '').trim();
             const cantO = parseInt(a.Cantidad) || 0;
             const k = id + '::' + aSku;
             const dD = devMap[k] || 0;
